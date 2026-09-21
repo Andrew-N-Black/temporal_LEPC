@@ -26,3 +26,5 @@ ggplot(eigenvec, aes(PC1, PC2)) +
     guides(
         fill = guide_legend(override.aes = list(shape = 21, size = 5, stroke = 0.5))
     )+theme_classic()
+
+#Note: F10 and F21 are the ones to the right along PC1. F17 F3 are further down on PC2
