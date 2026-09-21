@@ -8,17 +8,18 @@
 #   conda create -n lepc_rstats -c conda-forge -c bioconda \
 #       r-base r-optparse r-dplyr r-ggplot2 r-vcfr bioconductor-qvalue r-devtools
 #   conda activate lepc_rstats
-#   Rscript -e 'devtools::install_github("whitlock/OutFLANK")'
+# Rscript -e 'install.packages("remotes", repos = "https://cloud.r-project.org")'
+# Rscript -e 'remotes::install_github("whitlock/OutFLANK")'
+#
 # ============================================================================
-#SBATCH -A dewoody
 #SBATCH -J lepc_outflank_temporal
 #SBATCH -o lepc_outflank_temporal_%j.out
 #SBATCH -e lepc_outflank_temporal_%j.err
-#SBATCH -N 1
-#SBATCH -n 1
-#SBATCH -c 4
+#SBATCH --nodes=1
 #SBATCH --mem=32G
-#SBATCH -t 04:00:00
+#SBATCH --time=12:00:00
+#SBATCH -A dewoody
+#SBATCH -p cpu
 
 set -euo pipefail
 
