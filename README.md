@@ -137,6 +137,8 @@ See AUDIT.md for the full list with reasoning. Short version:
   workbook (once its column schema is confirmed).
 - The relatedness/kinship script and `popmap.txt` /
   `popmap_unrelated.txt` aren't committed yet.
-- Z-scaffold exclusion is still missing from three per-sample summary
-  steps (`heterozygosity_array.sh`, `roh_analyses.sh`, `run_ROHan.sh`'s
-  parsing step).
+- Z-scaffold exclusion is still missing from `run_ROHan.sh`'s parsing
+  step (`heterozygosity_array.sh` and `roh_analyses.sh`/`rohparser.py`
+  are now fixed -- the latter also had an unrelated bug that was
+  silently deflating every per-sample F(ROH) by ~506x; see AUDIT.md
+  section 5).
