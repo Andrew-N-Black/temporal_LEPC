@@ -1,13 +1,6 @@
 #!/bin/bash
 # =============================================================================
 # SLURM ARRAY JOB: PER-SAMPLE HETEROZYGOSITY (ANGSD + realSFS)
-# Step 07 — requires 06_downsample_and_finalize.sh to have completed
-# (reads final_cramlist.txt: OLD-cohort CRAMs as-is + depth-matched
-# NEW-cohort CRAMs). One array task per sample. Runs on all 20 samples,
-# including normal_F10 (the first-degree relative excluded from the
-# 19-sample "unrelated" set used elsewhere) -- per-sample heterozygosity
-# doesn't depend on relatedness to other samples the way PCA/FST/Ne do, so
-# there's no reason to drop F10 here.
 #
 # Restricted to autosomes: -rf points ANGSD at every contig in the
 # reference EXCEPT the two Z scaffolds (NW_026294758.1, NW_026294813.1;
@@ -29,15 +22,15 @@
 #SBATCH --job-name=lepc_het
 #SBATCH --output=logs/%x_%A_%a.out
 #SBATCH --error=logs/%x_%A_%a.err
-#SBATCH -A dewoody
+#SBATCH -A fnrdewoody
 #SBATCH -t 3-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=10
 #SBATCH --mem=50G
-#SBATCH -p cpu
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=blackan@purdue.edu
+#SBATCH -p cpu
 
 # =============================================================================
 # ENVIRONMENT SETUP
