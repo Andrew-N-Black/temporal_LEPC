@@ -100,32 +100,42 @@ paths, no era info) is present.
 
 ### 5. Z-scaffold exclusion is missing from three per-sample summary steps
 
-Unlike `run_plink.sh`, `remove_Z_scaffolds.sh`, and `outflank_drift.sh`
-(all correctly autosome-restricted), three scripts still compute their
+**Update:** two of the three below are now fixed. Unlike `run_plink.sh`,
+`remove_Z_scaffolds.sh`, and `outflank_drift.sh` (all correctly
+autosome-restricted from the start), three scripts computed their
 statistic **genome-wide**, including the Z scaffolds:
 
-- `analysis/heterozygosity_array.sh` — ANGSD `-doSaf` has no region
-  restriction.
-- `analysis/roh_analyses.sh` Step 3 — the ANGSD variant call feeding
-  `bcftools roh` has no region restriction, and the downstream
-  `rohparser.py` (vendored, downloaded at runtime — not inspected here)
-  computes the fROH denominator from the *whole* reference `.fai`.
-- `analysis/run_ROHan.sh` Step 2 — the length-class parsing sums ROH
-  segment lengths from *every* chromosome in `.mid.hmmrohl.gz`, Z included.
+- ~~`analysis/heterozygosity_array.sh` — ANGSD `-doSaf` had no region
+  restriction.~~ **Fixed.** Now builds a race-safe, shared ANGSD `-rf`
+  region file excluding the two Z scaffolds and passes it to `-doSaf`.
+- ~~`analysis/roh_analyses.sh` Step 6 / `rohparser.py` — the fROH
+  denominator was computed from the whole reference `.fai`.~~ **Fixed**,
+  and while fetching and actually reading the vendored `rohparser.py`
+  source to fix this, found it also had a second, unrelated, more severe
+  bug: it divided every sample's own ROH region counts/lengths by a
+  hardcoded `num_sam = 506` (left over from a different, 433-sample
+  cohort's copy of this script) before computing F(ROH) — an individual's
+  F(ROH) has no cohort-size term in its definition, so this was silently
+  deflating every reported per-sample F(ROH) by ~506x. `rohparser.py` is
+  now vendored locally (`analysis/rohparser.py`, no more runtime download
+  + sed patch) with both issues fixed, plus `--exclude-scaffolds` support;
+  verified against mock data with a hand-computed expected answer before
+  committing. **If any F(ROH) numbers from the old (ANGSD/bcftools-roh,
+  not ROHan) path have already been reported anywhere, they should be
+  re-derived — the ~506x deflation bug predates this session.**
+- `analysis/run_ROHan.sh` Step 2 — the length-class parsing still sums ROH
+  segment lengths from *every* chromosome in `.mid.hmmrohl.gz`, Z
+  included. **Still open.** ROHan's own per-sample fROH is a separate,
+  independent cross-check from the ANGSD/bcftools-roh path above (see
+  `roh_analyses.sh`'s own header comment on why both exist) and needs the
+  same autosomal restriction applied to its parsing step, but that wasn't
+  part of this pass.
 
 This matters because females are hemizygous for Z, so Z-linked sites look
-artificially homozygous — inflating both heterozygosity-downward and
-fROH-upward for females specifically, in a sex-biased way, if left in. This
-is exactly what a prior manuscript-editing session flagged as still
-needing "autosomal confirmation" for heterozygosity and fROH. I didn't fix
-these myself: doing it correctly for the ANGSD steps means building and
-passing a `-rf` autosomes-only region file (straightforward), but doing it
-correctly for the fROH *denominator* in `rohparser.py` means editing a
-script that's downloaded from an external URL at runtime and that I
-haven't inspected — a partial fix (excluding Z from the numerator via
-ANGSD but not from the denominator via `rohparser.py`) would be worse than
-the current, at-least-consistent whole-genome numbers. Worth a dedicated
-follow-up.
+artificially homozygous — inflating fROH and deflating heterozygosity for
+females specifically, in a sex-biased way, if left in. This is exactly
+what a prior manuscript-editing session flagged as still needing
+"autosomal confirmation" for heterozygosity and fROH.
 
 ### 6. Two smaller things worth a second look
 
