@@ -1,5 +1,36 @@
 #!/bin/bash
 # =============================================================================
+# *** STALE -- SUPERSEDED, DO NOT RUN AS-IS (see AUDIT.md) ***
+#
+# This is the FIRST draft of the load pipeline, from a single, never-
+# updated commit. Two rounds of revisions since are NOT reflected here:
+#
+#   1. GERP++ (Steps 0, 3-PREP, 3A, 3B below) was evaluated and dropped:
+#      the 11-taxon galliform alignment totals only ~0.72 substitutions/
+#      site, too shallow for informative per-site constraint scores, and
+#      gerpelem element calls showed no missense enrichment over synonymous
+#      variants. The final classification uses SnpEff impact (LOF=HIGH,
+#      MISSENSE=MODERATE, NEUTRAL=LOW/synonymous) alone, with Grantham
+#      (1974) physicochemical distance added as a severity gradient within
+#      missense variants (conservative <=100, radical >100).
+#   2. The VCF input below (out_new_sarek/.../joint_germline.norm.sorted.vcf.gz,
+#      all 20 samples, whole-genome) predates both the autosomal Z-scaffold
+#      exclusion and the normal_F10 first-degree-relative removal applied
+#      elsewhere in this repo (see remove_Z_scaffolds.sh, run_plink.sh,
+#      final_cramlist_unrel.txt). Realized load has not yet been
+#      recomputed on the autosomal, 19-sample (F10-removed) dataset.
+#
+# The final, 5-step, GERP-free, Grantham-scored pipeline (Steps 1: ancestral
+# sequence from chicken; 2: SnpEff + missense_aa_changes.tsv extraction;
+# 4: polarization; 5: classification + Grantham scoring; 6: per-individual
+# load with Wilcoxon tests) exists only in prior chat history, not as
+# committed files -- it was never pushed to this repo. See AUDIT.md for
+# what's known about it. Until those five scripts are recovered/rewritten
+# and re-pointed at the autosomal + unrelated VCF, treat every number this
+# script would produce as provisional and NOT the one reported in the
+# manuscript.
+# =============================================================================
+# =============================================================================
 # Lesser Prairie-Chicken (LEPC) Genetic Load Pipeline
 # Steps 1–6: Ancestral polarization (chicken) -> SnpEff annotation ->
 #            GERP++ constraint scoring -> deleterious site classification ->
