@@ -1,8 +1,9 @@
 library(tidyverse)
 library(dplyr)
 
-eigenvec <- read.table("joint_germline.pca.eigenvec", header = FALSE)
-eigenval <- scan("joint_germline.pca.eigenval")
+metadata <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/sarek_old_new/old_new_heterozygosity_unrel.xlsx")
+eigenvec <- read.table("joint_germline_auto_unrel.pca.eigenvec", header = FALSE)
+eigenval <- scan("joint_germline_auto_unrel.pca.eigenval")
 
 colnames(eigenvec) <- c("IID", paste0("PC", 1:(ncol(eigenvec) - 1)))
 pve <- round(eigenval / sum(eigenval) * 100, 1)
@@ -27,4 +28,4 @@ ggplot(eigenvec, aes(PC1, PC2)) +
         fill = guide_legend(override.aes = list(shape = 21, size = 5, stroke = 0.5))
     )+theme_classic()
 
-#Note: F10 and F21 are the ones to the right along PC1. F17 F3 are further down on PC2
+#Note: F17 and F3 are the ones to the right along PC1. F340 Is most positive along PC2
