@@ -42,10 +42,9 @@ set -u
 cd "$SLURM_SUBMIT_DIR"
 
 # --- Edit these paths/params for your run -----------------------------------
-RAW_VCF="/scratch/gautschi/blackan/GROUSE/old_vs_new/vcfs/output.subset.vcf.gz"
-FILT_VCF="${RAW_VCF%.vcf.gz}.biallelic.snps.vcf.gz"
-POPMAP="popmap.txt"          # <sample_id> <Past|Present>, no header
-
+RAW_VCF="/scratch/gautschi/blackan/GROUSE/old_vs_new/vcfs/output.subset.biallelic.snps.auto.vcf.gz"
+FILT_VCF="${RAW_VCF%.vcf.gz}.biallelic.snps.AUTO.vcf.gz"
+POPMAP="popmap_unrelated.txt"
 # Site classes: use SITECLASS if it exists; otherwise build it from SNPEFF_VCF.
 # If neither is available, the site-class step is skipped (with a warning).
 SITECLASS="siteclass.txt"    # <CHROM> <POS> <deleterious|neutral>, no header
@@ -61,7 +60,7 @@ MAX_FIT_LOCI=100000          # R: random loci used to fit the OutFLANK null
 RUN_OUTFLANK=TRUE            # R: TRUE/FALSE (result is reused from checkpoint on reruns)
 NE_MINFREQ=0.05              # R: exclude rare-allele loci from the Ne estimate
 JK_BLOCKSIZE=5000000         # R: jackknife block size (bp) for the Ne CI
-OUTPREFIX="results/old_vs_new_temporal"
+OUTPREFIX="results/old_vs_new_temporal_unrelated"
 THREADS="${SLURM_CPUS_PER_TASK:-1}"
 # -----------------------------------------------------------------------------
 
