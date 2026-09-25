@@ -26,7 +26,7 @@ module load biocontainers plink2
 export SINGULARITYENV_LD_PRELOAD=""
 export APPTAINERENV_LD_PRELOAD=""
 
-VCF="/scratch/gautschi/blackan/GROUSE/output_shotgun/variant_calling/normalized/joint_variant_calling/output.subset.biallelic.snps.auto.vcf.gz"
+VCF="/scratch/gautschi/blackan/GROUSE/old_vs_new/vcfs/output.subset.biallelic.snps.auto.vcf.gz"
 OUTDIR="/scratch/gautschi/blackan/GROUSE/old_vs_new/pca"
 PREFIX="joint_germline_auto_unrel"
 Z_SCAFFOLDS="NW_026294758.1,NW_026294813.1"   # Z (chicken synteny); male reference, no W
