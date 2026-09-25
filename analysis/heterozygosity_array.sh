@@ -76,8 +76,14 @@ if [[ -z "$CRAM" ]]; then
 fi
 
 SAMPLE=$(basename "$CRAM")
-SAMPLE="${SAMPLE%_filt.cram}"
-SAMPLE="${SAMPLE%_ds.cram}"
+# final_cramlist.txt entries are named <ID>.md.dedup_q20.cram (confirmed
+# against processing/final_cramlist.txt and the suffix run_ROHan.sh already
+# strips) -- NOT _filt.cram or _ds.cram, which don't match anything in this
+# project and previously left SAMPLE as the full, undotted filename. That
+# produced garbled sample IDs downstream (e.g. a heterozygosity_summary.tsv
+# row for "F10.md.dedup_q20.cram" instead of "F10"), breaking any join
+# against popmap.txt or the metadata spreadsheet by sample ID.
+SAMPLE="${SAMPLE%.md.dedup_q20.cram}"
 
 echo ">>> Array task ${SLURM_ARRAY_TASK_ID} -> sample: ${SAMPLE}"
 echo ">>> CRAM : ${CRAM}"

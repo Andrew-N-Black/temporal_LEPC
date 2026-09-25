@@ -40,7 +40,13 @@ set -euo pipefail
 # =============================================================================
 # USER-DEFINED VARIABLES
 # =============================================================================
-PROJECT_DIR="${CLUSTER_SCRATCH}/GROUSE/nexus"
+# PROJECT_DIR: this script is for the old_vs_new temporal cohort (n=20) --
+# same project as every other script in this repo. (A previously committed
+# version of this file had PROJECT_DIR pointing at the separate GROUSE/nexus
+# 433-sample project by mistake, left over from adapting this script for
+# that cohort; fixed here. ROHAN_BIN/GSL_PREFIX below correctly point at
+# old_vs_new regardless, since those tools are built once and shared.)
+PROJECT_DIR="${CLUSTER_SCRATCH}/GROUSE/old_vs_new"
 REF_FASTA="${PROJECT_DIR}/ref/GCF_026119805.1_pur_lepc_1.0_genomic.fna"
 FINAL_CRAMLIST="${PROJECT_DIR}/final_cramlist.txt"
 
