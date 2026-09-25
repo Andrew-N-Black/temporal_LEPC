@@ -52,13 +52,20 @@ FINAL_CRAMLIST="${PROJECT_DIR}/final_cramlist.txt"
 
 ROH_DIR="${PROJECT_DIR}/roh"
 
-# rohparser.py — vendored verbatim from the original repo rather than
-# reimplemented, so ROH size-class/FROH logic matches exactly. Its one
-# hardcoded path (a .fai file, for total genome length) is patched below
-# to point at our reference instead of the original's (different cluster).
-ROHPARSER_URL="https://raw.githubusercontent.com/Andrew-N-Black/LEPC-popgen/main/analysis/rohparser.py"
-ROHPARSER="${ROH_DIR}/rohparser.py"
-ROHPARSER_ORIG_FAI="${PROJECT_DIR}/ref/GCF_026119805.1_pur_lepc_1.0_genomic.fna.fai"
+# rohparser.py — a corrected, locally vendored copy (analysis/rohparser.py,
+# same directory as this script), not downloaded at runtime. The original
+# Andrew-N-Black/LEPC-popgen version had a hardcoded absolute
+# path_to_directory pointing at GROUSE/nexus (a different project) that a
+# runtime sed patch never touched (only its ref_index_file path was
+# patched), and divided every sample's own ROH counts/lengths by a
+# hardcoded cohort-size constant left over from that project (506 samples)
+# before computing F(ROH) -- silently deflating every F(ROH) value by that
+# factor. The vendored copy here takes --fai and --exclude-scaffolds as
+# CLI arguments instead of hardcoding either, and drops the cohort-size
+# division entirely (an individual's F(ROH) has no cohort-size term). See
+# that file's own header for the full list of changes.
+ROHPARSER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rohparser.py"
+Z_SCAFFOLDS="NW_026294758.1,NW_026294813.1"
 
 THREADS=$SLURM_CPUS_PER_TASK
 ROH_PARALLEL_JOBS=8
@@ -158,44 +165,18 @@ echo "  RG (called-region) lines: ${ROH_RG_ONLY}"
 echo "  $(wc -l < "$ROH_RG_ONLY") regions called across all samples"
 
 # =============================================================================
-# STEP 6: Per-sample ROH parsing with rohparser.py (vendored from the
-# original repo, patched to use our reference's .fai for genome length)
+# STEP 6: Per-sample ROH parsing with rohparser.py (locally vendored, see
+# CONFIG above), restricted to autosomes (excludes ${Z_SCAFFOLDS})
 # =============================================================================
-echo ">>> Step 6: Per-sample ROH parsing"
+echo ">>> Step 6: Per-sample ROH parsing (autosomal F(ROH), excluding ${Z_SCAFFOLDS})"
 
 if [[ ! -f "$ROHPARSER" ]]; then
-    echo ">>> Downloading rohparser.py"
-    wget -q -O "$ROHPARSER" "$ROHPARSER_URL"
-    # wget can exit 0 while still having written garbage (an error/proxy
-    # page, a truncated response, etc.) if compute nodes on this cluster
-    # lack outbound internet access -- and once a bad file lands here, the
-    # `-f "$ROHPARSER"` check above means every future run silently reuses
-    # it forever. Fail loudly now instead.
-    if ! python3 -m py_compile "$ROHPARSER" 2>/dev/null; then
-        echo "ERROR: downloaded rohparser.py is not valid Python." >&2
-        echo "  First bytes: $(head -c 80 "$ROHPARSER" | tr '\n' ' ')..." >&2
-        echo "  This usually means the download failed silently -- e.g. no" >&2
-        echo "  outbound internet access from compute nodes on this cluster" >&2
-        echo "  (login nodes often differ). Try downloading it on the login" >&2
-        echo "  node first and placing it at: ${ROHPARSER}" >&2
-        echo "    wget -O ${ROHPARSER} ${ROHPARSER_URL}" >&2
-        rm -f "$ROHPARSER"
-        exit 1
-    fi
-    rm -rf "$(dirname "$ROHPARSER")/__pycache__"
-    sed -i "s|${ROHPARSER_ORIG_FAI}|${REF_FASTA}.fai|g" "$ROHPARSER"
-    # sed doesn't error or warn if ROHPARSER_ORIG_FAI didn't actually match
-    # anything in the downloaded file -- it just silently leaves the
-    # original (wrong-cluster) path in place. Fail loudly instead of
-    # discovering this later as silently-wrong ROH results.
-    if ! grep -qF "${REF_FASTA}.fai" "$ROHPARSER"; then
-        echo "ERROR: rohparser.py patch did not take -- ROHPARSER_ORIG_FAI" >&2
-        echo "  ('${ROHPARSER_ORIG_FAI}') was not found verbatim in the" >&2
-        echo "  downloaded script. Check the source hasn't changed its" >&2
-        echo "  hardcoded path, update ROHPARSER_ORIG_FAI to match, and" >&2
-        echo "  delete ${ROHPARSER} to force a fresh download+patch." >&2
-        exit 1
-    fi
+    echo "ERROR: ${ROHPARSER} not found -- expected analysis/rohparser.py next to this script." >&2
+    exit 1
+fi
+if [[ ! -f "${REF_FASTA}.fai" ]]; then
+    echo "ERROR: ${REF_FASTA}.fai not found." >&2
+    exit 1
 fi
 
 # Single pass over the RG-only file, splitting by sample. NOTE: bcftools
@@ -286,10 +267,12 @@ run_rohparser() {
     local roh_file="$1"
     local bn
     bn=$(basename "$roh_file")
-    (cd "$(dirname "$roh_file")" && python3 "$ROHPARSER" "$bn") > "${roh_file}_results.txt"
+    (cd "$(dirname "$roh_file")" && python3 "$ROHPARSER" "$bn" \
+        --fai "${REF_FASTA}.fai" \
+        --exclude-scaffolds "$Z_SCAFFOLDS") > "${roh_file}_results.txt"
 }
 export -f run_rohparser
-export ROHPARSER
+export ROHPARSER REF_FASTA Z_SCAFFOLDS
 
 find "$ROH_DIR" -maxdepth 1 -name "*ROH.txt" \
     | xargs -I{} -P "$ROH_PARALLEL_JOBS" bash -c 'run_rohparser "$@"' _ {}
