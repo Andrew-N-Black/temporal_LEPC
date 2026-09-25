@@ -22,7 +22,7 @@ ml samtools
 # For CRAM files (sarek default output format)
 for f in ./*md.cram; do
     base=$(basename "$f" .cram)
-    samtools view -@ 10 -C -F 0x400 -q 20 -T /scratch/gautschi/blackan/GROUSE/grouse_asm/ref/GCF_026119805.1_pur_lepc_1.0_genomic.fna \
+    samtools view -@ 10 -C -F 0x400 -q 20 -T /scratch/gautschi/blackan/GROUSE/old_vs_new/ref/GCF_026119805.1_pur_lepc_1.0_genomic.fna \
         -o "./${base}.dedup_q20.cram" "$f"
     samtools index "./${base}.dedup_q20.cram"
 done
