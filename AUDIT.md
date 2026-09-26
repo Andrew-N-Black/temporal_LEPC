@@ -100,10 +100,10 @@ paths, no era info) is present.
 
 ### 5. Z-scaffold exclusion is missing from three per-sample summary steps
 
-**Update:** two of the three below are now fixed. Unlike `run_plink.sh`,
-`remove_Z_scaffolds.sh`, and `outflank_drift.sh` (all correctly
-autosome-restricted from the start), three scripts computed their
-statistic **genome-wide**, including the Z scaffolds:
+**Update:** all three below are now fixed (as of the most recent pass).
+Unlike `run_plink.sh`, `remove_Z_scaffolds.sh`, and `outflank_drift.sh`
+(all correctly autosome-restricted from the start), three scripts computed
+their statistic **genome-wide**, including the Z scaffolds:
 
 - ~~`analysis/heterozygosity_array.sh` — ANGSD `-doSaf` had no region
   restriction.~~ **Fixed.** Now builds a race-safe, shared ANGSD `-rf`
@@ -123,13 +123,22 @@ statistic **genome-wide**, including the Z scaffolds:
   committing. **If any F(ROH) numbers from the old (ANGSD/bcftools-roh,
   not ROHan) path have already been reported anywhere, they should be
   re-derived — the ~506x deflation bug predates this session.**
-- `analysis/run_ROHan.sh` Step 2 — the length-class parsing still sums ROH
-  segment lengths from *every* chromosome in `.mid.hmmrohl.gz`, Z
-  included. **Still open.** ROHan's own per-sample fROH is a separate,
-  independent cross-check from the ANGSD/bcftools-roh path above (see
-  `roh_analyses.sh`'s own header comment on why both exist) and needs the
-  same autosomal restriction applied to its parsing step, but that wasn't
-  part of this pass.
+- ~~`rohan_array.sh`/`rohan_parse.sh` (formerly `run_ROHan.sh`) — the
+  length-class parsing summed ROH segment lengths from every chromosome in
+  `.mid.hmmrohl.gz`, Z included.~~ **Fixed via a new script,
+  `analysis/rohan_parse_autosomal.sh`**, rather than editing
+  `rohan_parse.sh` in place, so the whole-genome and autosomal-only
+  summaries both stay available for comparison. Re-parses the same
+  already-computed `hmmrohl.gz` files (ROHan itself doesn't need
+  re-running), excludes the two Z scaffolds from both the ROH sum and the
+  genome-length denominator, uses the same two length bins as
+  `rohan_parse.sh` (100kb-1Mb, >1Mb), and does not depend on
+  `rohparser.py` (that script parses bcftools-roh's differently-shaped
+  "RG" line format, not ROHan's `hmmrohl` format — kept as a separate,
+  self-contained awk parser instead). Verified against mock `hmmrohl`
+  data + a mock `.fai` with a hand-computed expected answer (0.1 / 0.8 /
+  0.9) before committing — matched exactly, including a zero-ROH sample
+  and the Z-segment exclusion counter.
 
 This matters because females are hemizygous for Z, so Z-linked sites look
 artificially homozygous — inflating fROH and deflating heterozygosity for
