@@ -33,7 +33,7 @@ cd "$SLURM_SUBMIT_DIR"
 
 # --- Edit these paths/params for your run -----------------------------------
 VCF="/scratch/gautschi/blackan/GROUSE/old_vs_new/vcfs/output.subset.biallelic.snps.auto.vcf.gz"
-POPMAP="popmap_unrelated.txt"           # <sample_id> <Past|Present>, no header
+POPMAP="/scratch/gautschi/blackan/GROUSE/old_vs_new/popmap_unrelated.txt"           # <sample_id> <Past|Present>, no header
 OUTPREFIX="results/fst/old_vs_new_unrelated"
 WINDOW=50000                   # window size (bp)
 STEP=10000                     # step (bp)

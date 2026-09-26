@@ -15,51 +15,29 @@
 set -euo pipefail
 
 # =============================================================================
-# roh_parse_autosomal.sh -- self-contained, autosome-only re-parse of
-# roh_analyses.sh's bcftools-roh "RG" output into the same two length bins
-# rohparser.py uses (100kb-1Mb, >1Mb), without going through rohparser.py
-# at all.
+# roh_parse_autosomal.sh -- self-contained, autosome-only parse of
+# bcftools_roh.sh's "RG" output into F(ROH), in the same two length bins
+# ROHan/rohan_parse_autosomal.sh uses (100kb-1Mb, >1Mb). Reads the RG lines
+# directly and does the binning + F(ROH) arithmetic itself (no external
+# parser script, no hardcoded paths), so there's nothing upstream left to
+# silently bias the sizes.
 #
-# Why a second parser instead of just fixing rohparser.py further: this
-# repo has already had two separate cases where a "one script, one hardcoded
-# path/constant" design silently produced wrong per-sample numbers when
-# reused across projects or copied without updating every hardcoded
-# assumption (rohparser.py's old num_sam=506 cohort-size division; the
-# .cram vs .md.dedup_q20.cram suffix mismatch below). Rather than trust a
-# third layer on top of that history, this script reads bcftools roh's RG
-# lines directly and does the binning + F(ROH) arithmetic itself, in one
-# place, so there's nothing upstream left to silently bias the sizes.
-#
-# Depends only on roh_analyses.sh Steps 3-5 having already produced
-# ROH_GROUSE_PL_regions.txt (the RG-only lines) -- does NOT re-run ANGSD or
-# bcftools roh, since neither of those steps needs any change (bcftools
-# roh's own -AF-file analysis has no Z-restriction option to begin with;
-# only what happens to its output afterward needed fixing).
+# Depends only on bcftools_roh.sh having already produced
+# ROH_GROUSE_PL_regions.txt -- does not re-run ANGSD or bcftools roh.
 #
 # RG line format (bcftools roh, tab-separated):
 #   RG  Sample  Chromosome  Start  End  Length(bp)  NumMarkers  Quality
 #
-# Sample-ID caveat: ANGSD's -dobcf output uses whatever string was given
-# on each line of $FINAL_CRAMLIST, verbatim, as the sample identifier --
-# i.e. the FULL CRAM PATH, not a bare sample ID. roh_analyses.sh's own
-# Step 6 comment claims this path ends in plain ".cram", "confirmed against
-# final_cramlist.txt" -- but final_cramlist.txt actually ends in
-# ".md.dedup_q20.cram" (checked directly against
-# processing/final_cramlist.txt). That comment reads like a leftover from
-# an earlier, different project's copy of this script (the same class of
-# mismatch fixed previously in heterozygosity_array.sh). This script
-# strips BOTH possible suffixes (the real one first, a bare ".cram"
-# fallback second) so it self-corrects if the actual convention ever
-# differs from what's documented here, rather than silently producing
-# garbled sample IDs like the original bug did.
+# Sample-ID note: ANGSD's -dobcf output uses each line of $FINAL_CRAMLIST
+# verbatim as the sample identifier -- the full CRAM path, ending in
+# ".md.dedup_q20.cram" (confirmed against processing/final_cramlist.txt).
+# Strips that suffix, with a bare ".cram" fallback in case the convention
+# ever differs, rather than assuming one and risking garbled sample IDs.
 #
 # Every sample in $FINAL_CRAMLIST gets an output row even with zero called
-# ROH regions (seeded from the cramlist before reading any RG lines, same
-# reasoning as roh_analyses.sh's own placeholder-file step for
-# rohparser.py: a sample absent from the RG-only file would otherwise be
-# silently missing from the summary rather than reported as zero).
+# ROH regions, seeded before any RG line is read.
 #
-# USAGE (run any time after roh_analyses.sh Steps 3-5 have produced
+# USAGE (run any time after bcftools_roh.sh has produced
 # ROH_GROUSE_PL_regions.txt):
 #   sbatch roh_parse_autosomal.sh
 # =============================================================================
@@ -72,10 +50,10 @@ ROH_RG_ONLY="${ROH_DIR}/ROH_GROUSE_PL_regions.txt"
 OUT_TSV="${ROH_DIR}/roh_froh_summary_autosomal.tsv"
 
 # Same two Z scaffolds used throughout this repo (run_plink.sh,
-# remove_Z_scaffolds.sh, heterozygosity_array.sh, rohparser.py,
-# rohan_parse_autosomal.sh, run_lepc_relatedness.sh).
+# remove_Z_scaffolds.sh, heterozygosity_array.sh, ROHan/rohan_parse_autosomal.sh,
+# run_lepc_relatedness.sh).
 Z_SCAFFOLDS="NW_026294758.1,NW_026294813.1"
-# Same default rohparser.py used for the mean fwd-bwd phred quality filter.
+# Minimum mean fwd-bwd phred quality (bcftools roh's RG column 8) to keep a region.
 MIN_QUALITY=30
 
 for f in "$REF_FASTA.fai" "$FINAL_CRAMLIST" "$ROH_RG_ONLY"; do
@@ -117,7 +95,7 @@ echo -e "sample\tfROH_100kb-1Mb\tfROH_1Mb\tfROH_total\tn_segments_short\tn_segme
 
 # Single pass over the RG-only file (FNR==NR seeds every expected sample
 # at zero from SAMPLE_LIST_CLEAN before any RG line is read), binning into
-# the same two length classes rohparser.py/rohan_parse.sh use.
+# the same two length classes ROHan/rohan_parse_autosomal.sh uses.
 awk -v genome="$GENOME_LEN" -v z="$Z_SCAFFOLDS" -v minq="$MIN_QUALITY" '
     BEGIN { n = split(z, zarr, ","); for (i = 1; i <= n; i++) ZSET[zarr[i]] = 1 }
     FNR == NR { seen[$1] = 1; next }

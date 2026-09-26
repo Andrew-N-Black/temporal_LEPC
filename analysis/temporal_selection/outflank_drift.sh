@@ -43,8 +43,8 @@ cd "$SLURM_SUBMIT_DIR"
 
 # --- Edit these paths/params for your run -----------------------------------
 RAW_VCF="/scratch/gautschi/blackan/GROUSE/old_vs_new/vcfs/output.subset.biallelic.snps.auto.vcf.gz"
-FILT_VCF="${RAW_VCF%.vcf.gz}.biallelic.snps.AUTO.vcf.gz"
-POPMAP="popmap_unrelated.txt"
+FILT_VCF="${RAW_VCF%.vcf.gz}.temporal_filt.vcf.gz"
+POPMAP="/scratch/gautschi/blackan/GROUSE/old_vs_new/popmap_unrelated.txt"
 # Site classes: use SITECLASS if it exists; otherwise build it from SNPEFF_VCF.
 # If neither is available, the site-class step is skipped (with a warning).
 SITECLASS="siteclass.txt"    # <CHROM> <POS> <deleterious|neutral>, no header

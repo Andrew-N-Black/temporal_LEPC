@@ -15,28 +15,17 @@
 set -euo pipefail
 
 # =============================================================================
-# rohan_parse_autosomal.sh -- autosomal-only re-parse of ROHan's per-segment
-# output into the same length bins rohan_parse.sh uses (100kb-1Mb, >1Mb),
-# without re-running ROHan itself.
+# rohan_parse_autosomal.sh -- parse ROHan's per-segment output into F(ROH),
+# in the same two length bins bcftools_roh.sh/roh_parse_autosomal.sh use
+# (100kb-1Mb, >1Mb). Excludes the two Z scaffolds from both the ROH sum and
+# the genome-length denominator: females are hemizygous for Z, so Z-linked
+# sites look artificially homozygous, biasing fROH upward for females
+# specifically -- same reasoning as every other per-sample statistic in
+# this repo (heterozygosity_array.sh, run_plink.sh, roh_parse_autosomal.sh).
 #
-# rohan_parse.sh sums ROH segment lengths from every chromosome in each
-# sample's *.mid.hmmrohl.gz, Z scaffolds included. Females are hemizygous
-# for Z, so Z-linked sites look artificially homozygous -- biasing fROH
-# upward for females specifically, and inconsistent with every other
-# per-sample statistic in this repo (heterozygosity_array.sh, run_plink.sh,
-# roh_analyses.sh/rohparser.py), which are all autosome-restricted.
-#
-# This is a SEPARATE script from rohan_parse.sh (not an in-place edit), so
-# both the whole-genome and autosomal-only summaries stay available side by
-# side. Re-parses the SAME already-computed hmmrohl.gz files, so ROHan
-# itself does not need to be re-run.
-#
-# Does NOT go through analysis/rohparser.py: that script parses
-# bcftools-roh's "RG" line format (used by roh_analyses.sh, a completely
-# different upstream tool from ROHan), not ROHan's hmmrohl format. This
-# stays a self-contained awk parser, matching rohan_parse.sh's own
-# original style, rather than bolting a second, differently-shaped input
-# onto a parser built for the other pipeline's output.
+# Re-parses the already-computed hmmrohl.gz files -- ROHan itself does not
+# need to be re-run. Self-contained (no external parser script), matching
+# the approach in roh_parse_autosomal.sh for the bcftools-roh side.
 #
 # hmmrohl format (confirmed from actual output):
 #   #ROH_ID CHROM BEGIN END ROH_LENGTH VALIDATED_SITES
@@ -55,7 +44,7 @@ ROHAN_WINDOW_SIZE=50000
 EXPECTED_N_SAMPLES=20
 # Space-separated for the awk arrays below; same two scaffolds used
 # throughout this repo (run_plink.sh, remove_Z_scaffolds.sh,
-# roh_analyses.sh, run_lepc_relatedness.sh).
+# roh_parse_autosomal.sh, run_lepc_relatedness.sh).
 Z_SCAFFOLDS="NW_026294758.1 NW_026294813.1"
 
 if [[ ! -f "${REF}.fai" ]]; then
@@ -89,7 +78,8 @@ for HMMROHL in "$OUT_DIR"/*.win${ROHAN_WINDOW_SIZE}.mid.hmmrohl.gz; do
 
     SAMPLE=$(basename "$HMMROHL" | sed -E "s/\.win${ROHAN_WINDOW_SIZE}\.mid\.hmmrohl\.gz$//")
 
-    # Same two length classes as rohan_parse.sh: 100kb-1Mb (short) and
+    # Same two length classes bcftools_roh.sh/roh_parse_autosomal.sh use:
+    # 100kb-1Mb (short) and
     # >1Mb (long); segments below 100kb are excluded from both, matching
     # bcftools roh's own convention. Segments on either Z scaffold are
     # dropped before binning (n_z counts them, reported as

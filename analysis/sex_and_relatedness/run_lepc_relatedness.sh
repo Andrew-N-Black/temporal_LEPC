@@ -44,7 +44,7 @@ RUN_VCF=TRUE                  # Arm A
 RUN_NGSRELATE=FALSE            # Arm B (needs CRAMs and REF)
 
 VCF="/scratch/gautschi/blackan/GROUSE/old_vs_new/vcfs/output.subset.biallelic.snps.vcf.gz"
-POPMAP="popmap.txt"           # <sample_id> <Past|Present>, no header
+POPMAP="/scratch/gautschi/blackan/GROUSE/old_vs_new/popmap.txt"           # <sample_id> <Past|Present>, no header
 # Z scaffolds from find_sex_scaffolds.sh (chicken synteny); reference bird is male, so no W
 SEX_CHROMS="NW_026294758.1,NW_026294813.1"
 

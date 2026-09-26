@@ -1,12 +1,19 @@
 #!/bin/bash
 # =============================================================================
-# SLURM JOB SUBMISSION: PCA + admixture + inbreeding
+# SLURM JOB SUBMISSION: heterozygosity aggregation + PCA/admixture/inbreeding
+# (ANGSD -> pcangsd), whole-genome, all 20 samples.
 #
+# PCA/admixture here is superseded by run_plink.sh (autosomal, 19-sample
+# unrelated -- the one used in the manuscript). This script still owns the
+# only source of the pcangsd inbreeding coefficient (--inbreedSamples
+# --inbreedSites), a genotype-likelihood-based estimate independent of both
+# the bcftools-roh and ROHan fROH pipelines -- not yet re-run autosomal/
+# unrelated itself.
 #
 # USAGE:
-#   sbatch pca.sh
+#   sbatch pca_admixture_inbreeding.sh
 # =============================================================================
-#SBATCH --job-name=old.new_pca
+#SBATCH --job-name=old_new_pca_inbreed
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #SBATCH -A dewoody
@@ -53,7 +60,7 @@ PARALLEL_JOBS=8
 
 mkdir -p logs "$BEAGLE_DIR" "$PCA_DIR"
 
-echo ">>> 08_pca.sh"
+echo ">>> pca_admixture_inbreeding.sh"
 echo ">>> Start time: $(date)"
 
 if [[ ! -f "$FINAL_CRAMLIST" ]]; then
@@ -153,5 +160,5 @@ echo ">>> PCA analysis complete."
 echo "    Heterozygosity : ${HET_SUMMARY}"
 echo "    PCA            : ${PCA_DIR}/final.cov"
 echo "    Inbreeding     : ${PCA_DIR}/final_inbreed.*"
-echo "    ROH + ROHan    : run 08b_roh_resume.sh separately"
+echo "    ROH + ROHan    : run bcftools_roh.sh / ROHan\/rohan_array.sh separately"
 echo ">>> End time: $(date)"

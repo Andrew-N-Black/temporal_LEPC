@@ -44,7 +44,7 @@ REF_DIR="/scratch/gautschi/blackan/GROUSE/old_vs_new/ref"
 LEPC_REF="$REF_DIR/GCF_026119805.1_pur_lepc_1.0_genomic.fna"
 CHICKEN_FNA=""          # leave "" to auto-detect in REF_DIR, or give the full path
 VCF="/scratch/gautschi/blackan/GROUSE/old_vs_new/vcfs/output.subset.biallelic.snps.vcf.gz"
-POPMAP="popmap.txt"
+POPMAP="/scratch/gautschi/blackan/GROUSE/old_vs_new/popmap.txt"
 MIN_MAPQ=20             # PAF mapping quality filter
 MIN_FRAC=0.6            # scaffold's best chicken chromosome must hold >= this fraction of aligned bp
 MIN_ALIGNED=50000       # and at least this many aligned bp
