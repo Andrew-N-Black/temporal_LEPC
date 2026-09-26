@@ -146,6 +146,29 @@ females specifically, in a sex-biased way, if left in. This is exactly
 what a prior manuscript-editing session flagged as still needing
 "autosomal confirmation" for heterozygosity and fROH.
 
+**Update, follow-up pass:** `analysis/rohparser.py` is no longer the only
+way to get an autosomal ANGSD/bcftools-roh F(ROH). A new script,
+`analysis/roh_parse_autosomal.sh`, re-parses `roh_analyses.sh` Step 5's
+`ROH_GROUSE_PL_regions.txt` (the raw RG lines, all samples mixed together)
+directly — same two length bins, same Z exclusion, same quality filter
+(≥30) — without calling `rohparser.py` at all, so there's one fewer moving
+part between the raw bcftools-roh output and a reported F(ROH). Doesn't
+require re-running ANGSD or bcftools roh; only what happens to their
+output needed fixing.
+
+Building it surfaced a **third instance of the CRAM-suffix mismatch bug**
+(the same class as the `heterozygosity_array.sh` fix): `roh_analyses.sh`
+Step 6's own comment claims the BCF's sample identifiers end in plain
+`.cram`, "confirmed against final_cramlist.txt" — but
+`processing/final_cramlist.txt` actually ends in `.md.dedup_q20.cram`
+(checked directly). That comment reads like an unreviewed leftover from
+an earlier, different project's copy of this script. `roh_parse_autosomal.sh`
+strips both the real suffix and a bare `.cram` fallback defensively, so it
+self-corrects either way, but `roh_analyses.sh` Step 6's own per-sample
+`<sample>ROH.txt` splitting (used only by the `rohparser.py` path) still
+has the original, unverified `.cram`-only stripping — worth fixing there
+too if that path keeps being used alongside the new script.
+
 ### 6. Two smaller things worth a second look
 
 - `processing/cram_filtering.sh` references the reference genome at

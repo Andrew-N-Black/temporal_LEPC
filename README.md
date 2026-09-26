@@ -80,13 +80,15 @@ avoid breaking the relative-path calls above).
    beagle -> pcangsd; whole-genome, all 20) and
    `analysis/run_plink.sh` (PLINK2, autosomal, 19-sample unrelated --
    this is the one used in the manuscript).
-8. **ROH** -- `analysis/roh_analyses.sh` (ANGSD -> bcftools roh ->
-   vendored `rohparser.py`) and `analysis/rohan_array.sh` (formerly
-   `run_ROHan.sh` -- ROHan, a genotype-likelihood cross-check that doesn't
-   need called genotypes), parsed by `analysis/rohan_parse.sh`
-   (whole-genome) and `analysis/rohan_parse_autosomal.sh` (autosomal-only
-   -- the one to use; re-parses the same ROHan output, no need to re-run
-   it).
+8. **ROH** -- `analysis/roh_analyses.sh` (ANGSD -> bcftools roh), parsed
+   by either `analysis/rohparser.py` (legacy) or the newer, self-contained
+   `analysis/roh_parse_autosomal.sh` (no `rohparser.py` dependency,
+   preferred), and `analysis/rohan_array.sh` (formerly `run_ROHan.sh` --
+   ROHan, a genotype-likelihood cross-check that doesn't need called
+   genotypes), parsed by `analysis/rohan_parse.sh` (whole-genome) or
+   `analysis/rohan_parse_autosomal.sh` (autosomal-only, preferred). Both
+   `*_autosomal.sh` parsers re-parse already-computed output -- neither
+   ANGSD, bcftools roh, nor ROHan itself needs to be re-run.
 9. **Genetic load** -- `analysis/load.sh`. **Stale -- see AUDIT.md
    section 1 before using.**
 10. **Site classification** -- `analysis/make_siteclass.sh` (SnpEff
@@ -141,8 +143,9 @@ See AUDIT.md for the full list with reasoning. Short version:
   workbook (once its column schema is confirmed).
 - The relatedness/kinship script and `popmap.txt` /
   `popmap_unrelated.txt` aren't committed yet.
-- Z-scaffold exclusion is now applied everywhere it needs to be
-  (`heterozygosity_array.sh`, `roh_analyses.sh`/`rohparser.py`, and
-  `rohan_parse_autosomal.sh`). The `rohparser.py` fix also turned up an
-  unrelated bug that was silently deflating every per-sample F(ROH) by
-  ~506x; see AUDIT.md section 5.
+- Z-scaffold exclusion is now applied everywhere it needs to be, and
+  `analysis/roh_parse_autosomal.sh` gives an autosomal ANGSD/bcftools-roh
+  F(ROH) without depending on `rohparser.py` at all. Building it also
+  surfaced a third instance of the CRAM-suffix mismatch bug in
+  `roh_analyses.sh` Step 6's own comment/logic (claims `.cram`, actual
+  suffix is `.md.dedup_q20.cram`); see AUDIT.md section 5.
