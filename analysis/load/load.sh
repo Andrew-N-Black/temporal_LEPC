@@ -1033,6 +1033,180 @@ write_tsv(test_df, sprintf("%s/load/old_vs_new_tests.tsv", out))
 cat("\n=== Old vs New tests ===\n")
 print(test_df)
 
+
+# ===========================================================================
+# Sample-quality diagnostics, deleterious:neutral ratios, and sensitivity
+# analyses.
+#
+# A change in load between eras is only interpretable if it is not simply
+# tracking data quality. Under-called heterozygotes in a low-coverage sample
+# depress masked load and inflate realized load; if such samples are
+# concentrated in one era, that alone produces a "significant" era effect in
+# EVERY site class, including the neutral one. The three blocks below exist to
+# detect that case and to provide a statistic that is immune to it.
+#
+# Written in base R deliberately: these are the numbers the conclusions rest
+# on, and base R let them be tested directly rather than only parsed.
+# ===========================================================================
+
+## --- 1. per-individual call rate at classified sites ----------------------
+call_rate <- sapply(analysis_samples, function(s) {
+    calls <- gt[, s]
+    mean(!is.na(calls) & !grepl("\\.", calls))
+})
+quality_df <- data.frame(
+    individual = analysis_samples,
+    group      = unname(group_map[analysis_samples]),
+    call_rate  = as.numeric(call_rate),
+    stringsAsFactors = FALSE
+)
+quality_df <- quality_df[order(quality_df$call_rate), ]
+write.table(quality_df, sprintf("%s/load/sample_call_rate.tsv", out),
+            sep = "\t", quote = FALSE, row.names = FALSE)
+cat("\n=== Per-individual call rate at classified sites (ascending) ===\n")
+print(quality_df, row.names = FALSE)
+
+cr_old <- quality_df$call_rate[quality_df$group == "Old"]
+cr_new <- quality_df$call_rate[quality_df$group == "New"]
+cr_p <- suppressWarnings(wilcox.test(cr_new, cr_old)$p.value)
+cat(sprintf("\nCall rate: Old mean %.4f, New mean %.4f, Wilcoxon p = %.4f\n",
+            mean(cr_old), mean(cr_new), cr_p))
+if (!is.na(cr_p) && cr_p < 0.05) {
+    cat("  WARNING: call rate differs between eras, so raw load comparisons are\n")
+    cat("  confounded with data quality. Treat the ratio tests below as primary.\n")
+}
+
+## --- shared Wilcoxon driver ----------------------------------------------
+run_tests <- function(df, metrics, label) {
+    rows <- list()
+    for (k in unique(df$category)) {
+        d <- df[df$category == k, , drop = FALSE]
+        for (m in metrics) {
+            v_old <- d[[m]][d$group == "Old"]
+            v_new <- d[[m]][d$group == "New"]
+            v_old <- v_old[is.finite(v_old)]
+            v_new <- v_new[is.finite(v_new)]
+            if (length(v_old) > 1 && length(v_new) > 1) {
+                wt <- suppressWarnings(wilcox.test(v_new, v_old))
+                rows[[length(rows) + 1]] <- data.frame(
+                    analysis = label, category = k, metric = m,
+                    n_old = length(v_old), n_new = length(v_new),
+                    mean_old = mean(v_old), mean_new = mean(v_new),
+                    W = unname(wt$statistic), p_value = wt$p.value,
+                    stringsAsFactors = FALSE)
+            }
+        }
+    }
+    if (length(rows) == 0) return(NULL)
+    do.call(rbind, rows)
+}
+
+## --- 2. does load track call rate? ---------------------------------------
+cr_lookup <- setNames(quality_df$call_rate, quality_df$individual)
+load_df$call_rate <- unname(cr_lookup[load_df$individual])
+corr_rows <- list()
+for (k in unique(load_df$category)) {
+    d <- load_df[load_df$category == k, , drop = FALSE]
+    for (m in c("total_load", "realized_load", "masked_load")) {
+        ct <- suppressWarnings(cor.test(d$call_rate, d[[m]], method = "spearman"))
+        corr_rows[[length(corr_rows) + 1]] <- data.frame(
+            category = k, metric = m, rho = unname(ct$estimate),
+            p_value = ct$p.value, stringsAsFactors = FALSE)
+    }
+}
+corr_df <- do.call(rbind, corr_rows)
+write.table(corr_df, sprintf("%s/load/load_vs_callrate.tsv", out),
+            sep = "\t", quote = FALSE, row.names = FALSE)
+cat("\n=== Spearman correlation of load with call rate ===\n")
+print(corr_df, row.names = FALSE)
+cat("  A strong correlation means that metric is partly tracking data quality.\n")
+
+## --- 3. deleterious : neutral ratios (primary test) -----------------------
+# Each individual's deleterious load divided by its OWN neutral load. Anything
+# acting equally across site classes -- coverage, missingness, a genome-wide
+# demographic shift -- cancels, leaving change in deleterious burden relative
+# to the neutral baseline. This is the quantity the Rxy-style load literature
+# compares, and it is the appropriate primary test whenever call rate differs.
+neut <- load_df[load_df$category == "NEUTRAL", , drop = FALSE]
+nt <- setNames(neut$total_load,    neut$individual)
+nr <- setNames(neut$realized_load, neut$individual)
+nm <- setNames(neut$masked_load,   neut$individual)
+
+ratio_df <- load_df[load_df$category != "NEUTRAL", , drop = FALSE]
+ratio_df$ratio_total    <- ratio_df$total_load    / unname(nt[ratio_df$individual])
+ratio_df$ratio_realized <- ratio_df$realized_load / unname(nr[ratio_df$individual])
+ratio_df$ratio_masked   <- ratio_df$masked_load   / unname(nm[ratio_df$individual])
+ratio_df <- ratio_df[, c("individual", "group", "category",
+                         "ratio_total", "ratio_realized", "ratio_masked")]
+write.table(ratio_df, sprintf("%s/load/load_ratio_per_individual.tsv", out),
+            sep = "\t", quote = FALSE, row.names = FALSE)
+
+ratio_metrics <- c("ratio_total", "ratio_realized", "ratio_masked")
+ratio_tests <- run_tests(ratio_df, ratio_metrics, "ratio_all_samples")
+write.table(ratio_tests, sprintf("%s/load/old_vs_new_ratio_tests.tsv", out),
+            sep = "\t", quote = FALSE, row.names = FALSE)
+cat("\n=== PRIMARY TEST: Old vs New, deleterious:neutral ratios ===\n")
+print(ratio_tests, row.names = FALSE)
+
+## --- 4. leave-one-out influence ------------------------------------------
+# With n = 9 vs 10 a single atypical bird can create or destroy significance.
+# Drop each individual in turn; a result that only clears 0.05 while one
+# particular bird is present is not robust, whatever the full-sample p says.
+loo_for <- function(df, metrics, tag) {
+    rows <- list()
+    for (k in unique(df$category)) {
+        base_d <- df[df$category == k, , drop = FALSE]
+        for (m in metrics) {
+            ps <- setNames(rep(NA_real_, length(analysis_samples)), analysis_samples)
+            for (di in analysis_samples) {
+                d <- base_d[base_d$individual != di, , drop = FALSE]
+                v_old <- d[[m]][d$group == "Old"]
+                v_new <- d[[m]][d$group == "New"]
+                v_old <- v_old[is.finite(v_old)]
+                v_new <- v_new[is.finite(v_new)]
+                if (length(v_old) > 1 && length(v_new) > 1)
+                    ps[di] <- suppressWarnings(wilcox.test(v_new, v_old)$p.value)
+            }
+            if (all(is.na(ps))) next
+            rows[[length(rows) + 1]] <- data.frame(
+                analysis = tag, category = k, metric = m,
+                p_min = min(ps, na.rm = TRUE), p_max = max(ps, na.rm = TRUE),
+                most_influential = names(ps)[which.max(ps)],
+                robust_at_0.05 = max(ps, na.rm = TRUE) < 0.05,
+                stringsAsFactors = FALSE)
+        }
+    }
+    if (length(rows) == 0) return(NULL)
+    do.call(rbind, rows)
+}
+loo_df <- rbind(
+    loo_for(load_df,  c("total_load", "realized_load", "masked_load"), "raw"),
+    loo_for(ratio_df, ratio_metrics, "ratio"))
+write.table(loo_df, sprintf("%s/load/leave_one_out_influence.tsv", out),
+            sep = "\t", quote = FALSE, row.names = FALSE)
+cat("\n=== Leave-one-out influence ===\n")
+print(loo_df, row.names = FALSE)
+cat("  robust_at_0.05 = TRUE means the result survives removing ANY single bird.\n")
+
+## --- 5. exclusion sensitivity --------------------------------------------
+MIN_CALL_RATE <- 0.98
+low_q <- quality_df$individual[quality_df$call_rate < MIN_CALL_RATE]
+if (length(low_q) > 0) {
+    cat(sprintf("\n=== Sensitivity: excluding %d sample(s) with call rate < %.2f (%s) ===\n",
+                length(low_q), MIN_CALL_RATE, paste(low_q, collapse = ", ")))
+    excl <- rbind(
+        run_tests(load_df[!load_df$individual %in% low_q, , drop = FALSE],
+                  c("total_load", "realized_load", "masked_load"), "raw_highqual"),
+        run_tests(ratio_df[!ratio_df$individual %in% low_q, , drop = FALSE],
+                  ratio_metrics, "ratio_highqual"))
+    write.table(excl, sprintf("%s/load/old_vs_new_highqual_tests.tsv", out),
+                sep = "\t", quote = FALSE, row.names = FALSE)
+    print(excl, row.names = FALSE)
+} else {
+    cat(sprintf("\nNo sample falls below a call rate of %.2f; no exclusion analysis run.\n",
+                MIN_CALL_RATE))
+}
+
 cat("\nStep 6 complete.\n")
 REOF
 
@@ -1081,6 +1255,12 @@ echo "   $OUT/load/sites_classified.tsv               — per-site category (LOF
 echo "   $OUT/load/genetic_load_per_individual.tsv     — per-individual total/realized/masked load"
 echo "   $OUT/load/genetic_load_summary.tsv            — Old vs New group summary"
 echo "   $OUT/load/old_vs_new_tests.tsv                — Wilcoxon tests, Old vs New per category/metric"
+echo "   $OUT/load/sample_call_rate.tsv                — per-individual call rate (data-quality check)"
+echo "   $OUT/load/load_vs_callrate.tsv               — does load track call rate? (confound check)"
+echo "   $OUT/load/load_ratio_per_individual.tsv      — deleterious:neutral ratios per individual"
+echo "   $OUT/load/old_vs_new_ratio_tests.tsv         — PRIMARY: Old vs New on the ratios"
+echo "   $OUT/load/leave_one_out_influence.tsv        — is any result driven by one bird?"
+echo "   $OUT/load/old_vs_new_highqual_tests.tsv      — tests excluding low-call-rate samples"
 echo "============================================================"
 echo ""
 echo "============================================================"
