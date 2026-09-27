@@ -12,6 +12,15 @@
 # Design notes:
 #   - Derived alleles are polarized against a chicken-based ancestral
 #     sequence (Step 1), not against the reference allele.
+#   - Functional impact comes from SnpEff alone. Evolutionary constraint
+#     (GERP++ over an 11-taxon galliform Cactus alignment) was built and
+#     evaluated, then dropped: that tree totals only ~0.72 substitutions per
+#     site, which is too shallow for informative constraint. Per-site RS was
+#     effectively binary, and element-level calls (gerpelem) did not enrich
+#     missense over synonymous variants. The archived GERP version of this
+#     pipeline is kept separately if a deeper alignment is ever built.
+#   - Load is reported as total / realized / masked per individual per
+#     category, following the standard decomposition.
 # =============================================================================
 set -euo pipefail
 
@@ -63,13 +72,14 @@ module load minimap2
 module load samtools
 module load bcftools
 module load htslib
+module load bedtools
 set -euo pipefail
 
 echo "Aligning chicken (Gallus gallus) to LEPC reference: $(date)"
 
 # Auto-detect the chicken FASTA in the pre-downloaded reference directory
 # rather than assuming a filename — GALLUS_DIR also holds the LEPC reference
-# itself in this setup, so explicitly exclude REF from the candidates
+# itself in this setup, so explicitly exclude the LEPC reference from the candidates
 # (otherwise the glob could just as easily match the LEPC genome).
 CHICKEN_FASTA=$(find GALLUS_DIR -maxdepth 1 -iname "*.fa" -o -iname "*.fasta" -o -iname "*.fna" | grep -v "\.gz$" | grep -vxF "REF" | grep -vxF "ANC" | head -n 1)
 if [ -z "$CHICKEN_FASTA" ]; then
@@ -89,21 +99,179 @@ fi
 # Whole-genome pairwise alignment, chicken -> LEPC coordinates
 # asm10 is appropriate for cross-species divergence at this phylogenetic distance;
 # switch to asm20 if the alignment rate is low.
-minimap2 -ax asm10 -t THREADS REF "$CHICKEN_FASTA" | \
-    samtools sort -@ THREADS -o OUT/ancestral/gallus_to_lepc.bam -
-samtools index OUT/ancestral/gallus_to_lepc.bam
+CHICKEN_BAM=OUT/ancestral/gallus_to_lepc.bam
 
-# Call a consensus base at every LEPC position covered by a unique chicken
-# alignment; positions with no alignment or ambiguous (multi-mapping) coverage
-# are left as N and dropped downstream at the polarization step.
-bcftools mpileup -f REF OUT/ancestral/gallus_to_lepc.bam -Ou | \
-    bcftools call -c --ploidy 1 -Oz -o OUT/ancestral/gallus_consensus.vcf.gz
-tabix -p vcf OUT/ancestral/gallus_consensus.vcf.gz
+# The alignment dominates the runtime of this step and its output is reusable,
+# so skip it when a complete indexed BAM is already present. This makes
+# re-running Step 1 purely to rebuild the consensus/mask cheap.
+# `samtools quickcheck` is what makes reuse safe: it verifies the header and the
+# bgzf EOF block, so a BAM left half-written by a cancelled or timed-out job is
+# realigned rather than silently reused. A plain -s test would accept it.
+if [ -s "$CHICKEN_BAM" ] && [ -s "${CHICKEN_BAM}.bai" ] \
+        && samtools quickcheck -q "$CHICKEN_BAM"; then
+    echo "Reusing existing chicken alignment: $CHICKEN_BAM"
+else
+    if [ -s "$CHICKEN_BAM" ]; then
+        echo "Existing $CHICKEN_BAM failed quickcheck (truncated/incomplete) -- realigning."
+    fi
+    minimap2 -ax asm10 -t THREADS REF "$CHICKEN_FASTA" | \
+        samtools sort -@ THREADS -o "$CHICKEN_BAM" -
+    samtools index "$CHICKEN_BAM"
+fi
 
-bcftools consensus -f REF OUT/ancestral/gallus_consensus.vcf.gz \
+# Call a base at every LEPC position the chicken alignment covers. Without -v,
+# `bcftools call -c` emits a record for EVERY pileup position, not just variant
+# ones, so the position set of that file is exactly the set of LEPC coordinates
+# for which chicken data exists.
+CONS_CALLS=OUT/ancestral/gallus_consensus.vcf.gz
+
+# Also reusable, and also expensive. Note that `bcftools index --nrecords` is
+# NOT a valid integrity test here: it reads the index, not the data, so a stale
+# index reports a full record count for a half-written file. The bgzf EOF
+# marker is the real O(1) truncation test -- htslib appends a fixed 28-byte
+# empty block to every complete bgzf file, so its absence means the writing job
+# was cut short.
+BGZF_EOF_HEX="1f8b08040000000000ff0600424302001b0003000000000000000000"
+CALLS_OK=0
+if [ -s "$CONS_CALLS" ] && [ -s "${CONS_CALLS}.tbi" ]; then
+    if [ "$(tail -c 28 "$CONS_CALLS" | od -An -tx1 -v | tr -d ' \n')" = "$BGZF_EOF_HEX" ]; then
+        CALLS_OK=1
+    else
+        echo "Existing $CONS_CALLS lacks its bgzf EOF marker (truncated) -- recalling."
+    fi
+fi
+if [ "$CALLS_OK" -eq 1 ]; then
+    echo "Reusing existing chicken consensus calls: $CONS_CALLS"
+    echo "  records: $(bcftools index --nrecords "$CONS_CALLS")"
+else
+    bcftools mpileup -f REF "$CHICKEN_BAM" -Ou | \
+        bcftools call -c --ploidy 1 -Oz -o "$CONS_CALLS"
+    tabix -p vcf "$CONS_CALLS"
+fi
+
+# ---------------------------------------------------------------------------
+# CRITICAL: `bcftools consensus` only EDITS the reference where that call set
+# has a record. Every position the chicken alignment never reached is emitted
+# unchanged -- i.e. as the LEPC reference base -- which is indistinguishable
+# downstream from a confident "ancestral equals the reference base" call.
+# Left unmasked, that
+# silently reimposes the naive assumption that the reference allele is
+# ancestral across the majority of the genome (chicken covers only ~40% of the
+# LEPC assembly), inflating derived-allele counts and therefore every load
+# metric. An unmasked run of this step produced only 2 "no ancestral call"
+# sites out of 13.2M -- implausible, and the tell that this was happening.
+#
+# Fix: derive the complement of the called positions and hard-mask it to N.
+# Because the mask is built from that same call set, the invariant is
+# exact -- every non-N base in the ancestral FASTA is backed by a chicken
+# record. Step 4 already skips N ancestral calls, so this is what makes the
+# polarization honest.
+# ---------------------------------------------------------------------------
+GENOME_SIZES=OUT/ancestral/lepc_genome_sizes.txt
+COVERED_BED=OUT/ancestral/gallus_covered.bed
+INDEL_PAD_BED=OUT/ancestral/gallus_indel_pad.bed
+RELIABLE_BED=OUT/ancestral/gallus_reliable.bed
+UNCOV_BED=OUT/ancestral/gallus_uncovered.bed
+INDEL_RAW_BED=OUT/ancestral/gallus_indel_raw.bed
+CONS_SNV_CALLS=OUT/ancestral/gallus_consensus.snvonly.vcf.gz
+INDEL_PAD_BP=10
+
+cut -f1,2 REF.fai > "$GENOME_SIZES"
+
+# ---------------------------------------------------------------------------
+# SECOND CRITICAL ISSUE: `bcftools consensus` APPLIES indels, which shifts every
+# downstream coordinate on that contig. An ancestral FASTA built from a call set
+# containing indels is therefore NOT in reference coordinates: Step 4 looks up
+# LEPC position POS and silently gets the base from a different position, with
+# the error growing along the contig. On this dataset that shifted 22 contigs by
+# up to +611 bp, including most of the macrochromosomes -- so the majority of
+# "polarized" calls were reading the wrong base entirely.
+#
+# Fix: apply SNVs only, which are 1->1 substitutions and preserve length exactly.
+# Indels themselves are not usable as ancestral states anyway, and the alignment
+# immediately around them is ambiguous, so those positions get masked instead.
+# ---------------------------------------------------------------------------
+bcftools view -V indels -Oz -o "$CONS_SNV_CALLS" "$CONS_CALLS"
+tabix -p vcf "$CONS_SNV_CALLS"
+
+# Extract indel spans once and reuse. Two deliberate choices here:
+#   * `view -v indels` rather than a -i 'TYPE="indel"' filter expression. The
+#     filter form is rejected by some bcftools builds, which parse `indel` as an
+#     undefined INFO tag ("the tag \"indel\" is not defined in the VCF header");
+#     the -v flag is portable across versions.
+#   * %END rather than %POS, so the interval spans the entire REF allele. A
+#     multi-base deletion must be masked across its full length, not just at its
+#     first base.
+# The record count is taken from this file so the call set is not streamed a
+# second time just to count indels -- it holds hundreds of millions of records.
+bcftools view -v indels "$CONS_CALLS" -Ou \
+    | bcftools query -f '%CHROM\t%POS0\t%END\n' > "$INDEL_RAW_BED"
+INDEL_COUNT=$(wc -l < "$INDEL_RAW_BED")
+
+echo "Consensus calls: $(bcftools index --nrecords "$CONS_CALLS") total, \
+$(bcftools index --nrecords "$CONS_SNV_CALLS") substitutions applied, \
+$INDEL_COUNT indels excluded"
+
+# Coverage comes from ALL called positions -- that is where chicken data exists.
+bcftools query -f '%CHROM\t%POS0\t%POS\n' "$CONS_CALLS" \
+    | bedtools merge -i - > "$COVERED_BED"
+
+# Positions within INDEL_PAD_BP of a called indel are alignment-ambiguous, so
+# their ancestral state is not trustworthy even though coverage exists.
+awk -v PAD="$INDEL_PAD_BP" 'BEGIN { OFS = "\t" }
+    { start = $2 - PAD; if (start < 0) start = 0; print $1, start, $3 + PAD }' \
+    "$INDEL_RAW_BED" | bedtools sort -i - | bedtools merge -i - > "$INDEL_PAD_BED"
+
+bedtools subtract -a "$COVERED_BED" -b "$INDEL_PAD_BED" > "$RELIABLE_BED"
+# complement emits fully-uncovered contigs in their entirety, so scaffolds with
+# no chicken alignment at all are masked end to end rather than skipped.
+bedtools complement -i "$RELIABLE_BED" -g "$GENOME_SIZES" > "$UNCOV_BED"
+
+bcftools consensus -f REF --mask "$UNCOV_BED" --mask-with N \
+    "$CONS_SNV_CALLS" \
     > ANC
 
 samtools faidx ANC
+
+# Assert the ancestral FASTA is in exact reference coordinates. This is the
+# check whose absence let the indel-shift bug above corrupt a whole run
+# undetected: every downstream output looked entirely normal.
+CTG_TOTAL=$(wc -l < REF.fai)
+CTG_JOINED=$(join -j1 <(cut -f1,2 REF.fai | sort -k1,1) \
+                      <(cut -f1,2 ANC.fai | sort -k1,1) | wc -l)
+LEN_DIFFS=$(join -j1 <(cut -f1,2 REF.fai | sort -k1,1) \
+                     <(cut -f1,2 ANC.fai | sort -k1,1) | awk '$2 != $3' | wc -l)
+echo "Coordinate check: $CTG_JOINED / $CTG_TOTAL contigs present, $LEN_DIFFS length mismatch(es)"
+if [ "$CTG_JOINED" -ne "$CTG_TOTAL" ] || [ "$LEN_DIFFS" -ne 0 ]; then
+    echo "ERROR: ancestral FASTA is NOT in reference coordinates." >&2
+    join -j1 <(cut -f1,2 REF.fai | sort -k1,1) <(cut -f1,2 ANC.fai | sort -k1,1) \
+        | awk '$2 != $3 { printf "       %s: ref=%s ancestral=%s\n", $1, $2, $3 }' >&2
+    echo "       Indels were applied, so every position after the first indel" >&2
+    echo "       on these contigs is shifted and polarization would read the" >&2
+    echo "       wrong base. Do NOT use this file." >&2
+    exit 1
+fi
+
+# Guard: the ancestral FASTA MUST come out substantially masked. Chicken and
+# LEPC are ~35 My diverged and chicken aligns to a minority of this assembly,
+# so a low N fraction means masking silently failed. Fail loudly here rather
+# than emit plausible-looking load estimates from an unmasked ancestral
+# sequence -- that failure mode is invisible in every downstream output.
+read MASKED_BASES TOTAL_BASES < <(awk '!/^>/ {
+        TOTAL  += length($0)
+        MASKED += gsub(/[Nn]/, "")
+    } END { print MASKED+0, TOTAL+0 }' ANC)
+MASK_PCT=$(awk -v m="$MASKED_BASES" -v t="$TOTAL_BASES" \
+    'BEGIN { if (t > 0) printf "%.2f", 100*m/t; else print "0" }')
+
+echo "Ancestral FASTA masked: $MASKED_BASES / $TOTAL_BASES bp = ${MASK_PCT}% N"
+if awk -v p="$MASK_PCT" 'BEGIN { exit (p < 20) ? 0 : 1 }'; then
+    echo "ERROR: only ${MASK_PCT}% of the ancestral FASTA is masked to N." >&2
+    echo "       Expected roughly 50-65% (chicken covers a minority of the" >&2
+    echo "       LEPC genome). Masking did not take effect -- do NOT use this" >&2
+    echo "       file for polarization; derived-allele counts would be biased." >&2
+    exit 1
+fi
 
 echo "Ancestral FASTA written to: ANC"
 echo "Step 1 complete: $(date)"
@@ -175,7 +343,7 @@ CFGEOF
 
 snpEff build -c "$CONFIG_FILE" $BUILD_FLAG -v SNPEFF_DB -noCheckCds -noCheckProtein
 
-# --- Annotate the joint VCF ---
+# --- Annotate the joint call set ---
 snpEff -Xmx16g -c "$CONFIG_FILE" -v SNPEFF_DB \
     VCF \
     > OUT/snpeff/lepc_snpeff.vcf
@@ -238,7 +406,7 @@ set -euo pipefail
 # interpreter has no third-party packages installed.
 command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 not found on PATH" >&2; exit 1; }
 
-# Pull the reference/alt alleles for every biallelic SNP in the annotated VCF
+# Pull the reference/alt alleles for every biallelic SNP in the annotated file
 bcftools query -f '%CHROM\t%POS\t%RE''F\t%ALT\n' OUT/snpeff/lepc_snpeff.vcf.gz \
     > OUT/polarized/sites_ref_alt.tsv
 
@@ -301,7 +469,7 @@ anc = IndexedFasta(anc_path)
 n_in = n_kept = 0
 n_skip_not_snv = n_skip_no_call = n_skip_mismatch = 0
 
-# Streamed rather than accumulated in memory: this VCF has millions of sites.
+# Streamed rather than accumulated in memory: the input has millions of sites.
 with open("%s/sites_ref_alt.tsv" % out_dir) as fh, \
         open("%s/sites_polarized.tsv" % out_dir, "w") as sink:
     sink.write("chrom\tpos\tref\talt\tancestral\tderived\n")
@@ -313,7 +481,7 @@ with open("%s/sites_ref_alt.tsv" % out_dir) as fh, \
         n_in += 1
 
         # Polarization is only meaningful for biallelic single-nucleotide
-        # sites. The input VCF is already filtered to those, so anything
+        # sites. The input is already filtered to those, so anything
         # else here is unexpected -- count it rather than silently coercing.
         if len(ref) != 1 or len(alt) != 1 or "," in alt:
             n_skip_not_snv += 1
@@ -347,6 +515,27 @@ print("Polarized: %d (%.1f%% of input sites)"
 if n_kept == 0:
     sys.exit("ERROR: no sites could be polarized -- check that the ancestral "
              "FASTA contig names match the VCF's.")
+
+# Guard against an UNMASKED ancestral FASTA. Chicken aligns to only a minority
+# of the LEPC assembly, so a correctly masked ancestral sequence must yield a
+# large "no ancestral call" fraction. If that count is near zero, the ancestral
+# FASTA is almost certainly carrying the LEPC reference base at unaligned
+# positions, and every such site is being polarized as ancestral-equals-
+# reference by
+# construction. That produces a full, healthy-looking output table whose
+# derived-allele counts are systematically inflated -- so fail here instead.
+frac_no_call = 100.0 * n_skip_no_call / max(n_in, 1)
+print("  (no-ancestral-call fraction: %.1f%%)" % frac_no_call)
+if frac_no_call < 5.0:
+    sys.exit(
+        "ERROR: only %.2f%% of sites had no ancestral call. Expected a large\n"
+        "       fraction, because chicken covers a minority of the LEPC genome.\n"
+        "       This means the ancestral FASTA is NOT masked: unaligned\n"
+        "       positions still hold the LEPC reference base and are being\n"
+        "       polarized as ancestral-equals-reference, biasing load metrics.\n"
+        "       Re-run Step 1 (the alignment is reused; only the consensus and\n"
+        "       mask are rebuilt) and confirm it reports a masked %% of ~50-65."
+        % frac_no_call)
 PYEOF
 
 echo "Step 4 complete: $(date)"
@@ -648,13 +837,38 @@ awk -F'\t' '
 echo "  Classified sites to genotype: $(wc -l < "$REGIONS")"
 
 bcftools query -l VCF > "$SAMPLE_LIST"
-bcftools query -R "$REGIONS" -f '%CHROM\t%POS[\t%GT]\n' VCF > "$GT_TABLE"
+
+# `bcftools query -R` uses random access and therefore requires a tabix/csi
+# index. The analysis call set is not necessarily indexed, so build one rather
+# than failing here. If indexing is not possible (read-only filesystem, say),
+# fall back to -T, which takes the same targets file but streams the whole call
+# set instead of seeking -- slower, but it needs no index and gives identical
+# output. The longest LEPC scaffold is ~109 Mb, well under tbi's 512 Mb limit.
+if [ -s "VCF.tbi" ] || [ -s "VCF.csi" ]; then
+    QUERY_MODE=-R
+else
+    echo "  No index found for the analysis call set -- creating one."
+    if bcftools index -t -f VCF 2>/dev/null || bcftools index -f VCF 2>/dev/null; then
+        QUERY_MODE=-R
+        echo "  Index created."
+    else
+        QUERY_MODE=-T
+        echo "  Could not create an index -- falling back to a streaming query."
+    fi
+fi
+
+bcftools query "$QUERY_MODE" "$REGIONS" -f '%CHROM\t%POS[\t%GT]\n' VCF > "$GT_TABLE"
 
 [ -s "$GT_TABLE" ] || { echo "ERROR: bcftools returned no genotypes -- check that the" >&2; \
     echo "  contig names in $SITES match the variant file's." >&2; exit 1; }
 echo "  Genotype rows returned: $(wc -l < "$GT_TABLE")"
 
-Rscript << 'REOF'
+# Rscript does not read a script from stdin the way `python3 -` does -- given no
+# file argument it just prints its usage and exits. Write the analysis to a file
+# and run that. This is also more convenient operationally: the R stage can be
+# re-run on its own without repeating the expensive genotype query above.
+R_SCRIPT=OUT/load/compute_load.R
+cat << 'REOF' > "$R_SCRIPT"
 library(tidyverse)
 
 out <- "OUT"
@@ -678,6 +892,28 @@ vcf_site <- paste(gt_raw$chrom, gt_raw$pos, sep = ":")
 gt <- as.matrix(gt_raw[, samples, drop = FALSE])
 rownames(gt) <- vcf_site
 cat(sprintf("Loaded genotypes: %d sites x %d samples\n", nrow(gt), ncol(gt)))
+
+# The call set may carry samples that are not in the Old/New lists -- the
+# excluded related individual, for example. Looping over them would fail on
+# group_map[[ind]] with "subscript out of bounds", and it would fail deep in
+# the loop, after the expensive genotype query. Reconcile up front instead.
+analysis_samples <- intersect(colnames(gt), names(group_map))
+unknown_samples  <- setdiff(colnames(gt), names(group_map))
+missing_samples  <- setdiff(names(group_map), colnames(gt))
+if (length(unknown_samples) > 0) {
+    cat(sprintf("NOTE: %d sample(s) in the call set are not in the Old/New lists and are skipped: %s\n",
+                length(unknown_samples), paste(unknown_samples, collapse = ", ")))
+}
+if (length(missing_samples) > 0) {
+    cat(sprintf("WARNING: %d listed sample(s) are absent from the call set: %s\n",
+                length(missing_samples), paste(missing_samples, collapse = ", ")))
+}
+if (length(analysis_samples) == 0) {
+    stop("No call-set sample matches the Old/New lists -- check that the sample lists use the same names as the call set.")
+}
+cat(sprintf("Analysing %d samples (%d Old, %d New)\n", length(analysis_samples),
+            sum(group_map[analysis_samples] == "Old"),
+            sum(group_map[analysis_samples] == "New")))
 
 # For each site, figure out which allele (0=reference, 1=ALT) is the derived one
 site_lookup <- sites %>%
@@ -710,9 +946,13 @@ for (cat in c("LOF", "MISSENSE", "MISSENSE_RADICAL", "MISSENSE_CONSERVATIVE", "N
 
     gt_sub <- gt[idx, , drop = FALSE]
 
-    for (ind in colnames(gt_sub)) {
+    for (ind in analysis_samples) {
         calls <- gt_sub[, ind]
-        called <- !is.na(calls) & calls != "./." & calls != ".|." & calls != "."
+        # Require BOTH alleles to be called. A half-call such as "./1" would
+        # otherwise pass and be scored as a diploid genotype with the missing
+        # allele silently treated as reference, biasing derived counts down
+        # while still counting the site in the denominator.
+        called <- !is.na(calls) & !grepl("\\.", calls)
 
         # Normalize genotype separators and pull the two alleles per site
         alleles <- strsplit(gsub("\\|", "/", calls[called]), "/")
@@ -795,6 +1035,8 @@ print(test_df)
 
 cat("\nStep 6 complete.\n")
 REOF
+
+Rscript "$R_SCRIPT"
 
 echo "Step 6 complete: $(date)"
 EOF
