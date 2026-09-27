@@ -12,15 +12,6 @@
 # Design notes:
 #   - Derived alleles are polarized against a chicken-based ancestral
 #     sequence (Step 1), not against the reference allele.
-#   - Functional impact comes from SnpEff alone. Evolutionary constraint
-#     (GERP++ over an 11-taxon galliform Cactus alignment) was built and
-#     evaluated, then dropped: that tree totals only ~0.72 substitutions per
-#     site, which is too shallow for informative constraint. Per-site RS was
-#     effectively binary, and element-level calls (gerpelem) did not enrich
-#     missense over synonymous variants. The archived GERP version of this
-#     pipeline is kept separately if a deeper alignment is ever built.
-#   - Load is reported as total / realized / masked per individual per
-#     category, following the standard decomposition.
 # =============================================================================
 set -euo pipefail
 
