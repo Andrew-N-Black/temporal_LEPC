@@ -214,6 +214,10 @@ ggsave(file.path(OUT_DIR, "fig2_ratio_primary.png"), p2,
 d3 <- relabel(merge(load_df, qual_df[, c("individual", "call_rate")],
                     by = "individual"), DISJOINT)
 
+# The label sits ABOVE the topmost point (vjust = 0 at the panel maximum),
+# not hanging down from it -- with vjust = 1 it lands directly on the
+# lowest-call-rate bird, which is the highest point in most panels. The upper
+# axis expansion below supplies the room it needs.
 ann3 <- do.call(rbind, lapply(split(d3, d3$class, drop = TRUE), function(d) {
   ct <- suppressWarnings(cor.test(d$call_rate, d$realized_load, method = "spearman"))
   data.frame(class = d$class[1], label = sprintf("rho = %.2f", unname(ct$estimate)),
@@ -226,11 +230,11 @@ p3 <- ggplot(d3, aes(call_rate, realized_load, colour = era)) +
               colour = INK_SOFT, linewidth = 0.4, linetype = "22") +
   geom_point(size = PT_SIZE, alpha = PT_ALPHA, stroke = 0) +
   geom_text(data = ann3, aes(x, y, label = label), inherit.aes = FALSE,
-            colour = INK_SOFT, size = 3.1, hjust = 0, vjust = 1) +
+            colour = INK_SOFT, size = 3.1, hjust = 0, vjust = 0) +
   facet_wrap(~ class, scales = "free_y", nrow = 1) +
   scale_colour_manual(values = ERA_COLS) +
   scale_x_continuous(labels = function(x) sprintf("%.2f", x)) +
-  scale_y_continuous(expand = expansion(mult = c(0.05, 0.10))) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.16))) +
   labs(x = "Genotype call rate at classified sites", y = "Realized load") +
   theme_load()
 ggsave(file.path(OUT_DIR, "fig3_callrate_check.png"), p3,
