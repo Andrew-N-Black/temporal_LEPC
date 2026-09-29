@@ -21,7 +21,7 @@ library(dplyr)
 #load metadata
 HET_FILT <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/sarek_old_new/old_new_heterozygosity.xlsx")
 #Plot
-ggplot(HET_FILT, aes(x=GRP, y=heterozygosity20x, fill=GRP)) +
+ggplot(HET_FILT, aes(x=GRP, y=heterozygosity_angsd, fill=GRP)) +
     geom_boxplot() +
     scale_fill_manual("", values=c("Past"="cadetblue","Present"="black")) +
     xlab("") + ylab("H") +
@@ -33,17 +33,17 @@ ggplot(HET_FILT, aes(x=GRP, y=heterozygosity20x, fill=GRP)) +
 
 
 #Test for normality
-shapiro.test(HET_FILT$HET)
+shapiro.test(HET_FILT$heterozygosity_angsd)
 
 data:  HET_FILT$HET
-W = 0.84473, p-value = 0.004355
+#W = 0.84473, p-value = 0.004355
 
 #Pairwise test of heterozygosity by ecoregion
-pairwise.wilcox.test(HET_FILT$heterozygosity20x, HET_FILT$GRP, p.adjust.method = "BH")
+pairwise.wilcox.test(HET_FILT$heterozygosity_angsd, HET_FILT$GRP, p.adjust.method = "BH")
 
 	Pairwise comparisons using Wilcoxon rank sum exact test 
 
-data:  HET_FILT$heterozygosity20x and HET_FILT$GRP 
+data:  HET_FILT$heterozygosity_angsd and HET_FILT$GRP 
 
         Past
 Present 0.53
