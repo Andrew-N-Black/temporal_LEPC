@@ -15,11 +15,7 @@ library(dplyr)
 HET_FILT <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/sarek_old_new/old_new_heterozygosity.xlsx")
 
 #Extract relevant information
-# heterozygosity20x   = ANGSD/realSFS (heterozygosity4x holds the same values)
-# heterozygosity_rohan = ROHan genome-wide estimate (CI in 'low'/'high');
-#   a second ROHan column, 'heterozygosity_rohan.1' (CI 'minus'/'plus'), also
-#   exists -- swap it in below if that is the estimate you want to report.
-het_cols <- c("heterozygosity20x", "heterozygosity_rohan")
+het_cols <- c("heterozygosity_angsd", "heterozygosity_rohan")
 sub <- as.data.frame(HET_FILT[, c("ID", "GRP", het_cols)])
 
 #Convert to long format
@@ -32,12 +28,7 @@ melt_data$GRP <- factor(melt_data$GRP, levels = c("Past", "Present"))
 #Plot
 p <- ggplot(melt_data, aes(x = GRP, y = H, fill = GRP)) +
     # Boxes semi-transparent so same-colored points stay visible on top
-    geom_boxplot(outlier.shape = NA) +
-    # Points take each group's fill; black outline keeps Present points
-    # distinct from the Present box
-    geom_jitter(aes(fill = GRP), shape = 21, color = "black", size = 2.5,
-                alpha = 0.9, width = 0.12, height = 0) +
-    facet_wrap(~ het_method, scales = "free_y") +
+    geom_boxplot() +facet_wrap(~ het_method) +
     stat_compare_means(method = "wilcox.test", label = "p.format",
                        label.x = 1.35, size = 5) +
     scale_fill_manual("", values = c("Past" = "cadetblue", "Present" = "black")) +
@@ -71,5 +62,22 @@ melt_data %>%
     group_by(het_method, GRP) %>%
     summarise(n = n(), mean_H = mean(H), sd_H = sd(H), median_H = median(H), .groups = "drop")
 
+# A tibble: 4 × 6
+#  het_method GRP         n  mean_H      sd_H median_H
+#  <fct>      <fct>   <int>   <dbl>     <dbl>    <dbl>
+#1 ANGSD      Past       10 0.00405 0.000229   0.00400
+#2 ANGSD      Present    10 0.00402 0.0000427  0.00403
+#3 ROHan      Past       10 0.00339 0.000148   0.00338
+#4 ROHan      Present    10 0.00334 0.0000306  0.00334
+
+
 #Agreement between methods
-cor.test(sub$heterozygosity20x, sub$heterozygosity_rohan, method = "pearson")
+#cor.test(sub$heterozygosity_angsd, sub$heterozygosity_rohan, method = "pearson")
+#data:  sub$heterozygosity_angsd and sub$heterozygosity_rohan
+#t = 11.218, df = 18, p-value = 1.482e-09
+#alternative hypothesis: true correlation is not equal to 0
+#95 percent confidence interval:
+# 0.8408530 0.9745053
+#sample estimates:
+#      cor 
+# 0.9353389 
