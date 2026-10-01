@@ -18,6 +18,10 @@
 #   karyotype/<SPECIES>_<SAMPLE>_<HAP>.png                  one per assembly
 #   synteny/<A>__vs__<B>.png                                one per pair
 #
+# Every PNG is written with a matching .svg (vector, for figures that will be
+# resized or edited in Illustrator/Inkscape). Set SAVE_SVG=false below for
+# PNG only.
+#
 # USAGE:
 #   sbatch 04_busco_plots.sh
 #
@@ -25,6 +29,15 @@
 #   pairs to draw, plot orientation, how many chromosomes to show, and which
 #   plot types to skip on a rerun.
 #
+# INSTALL NOTE (why this does not pip-install the package):
+#   `pip install buscoplotpy` gives PyPI 0.0.2, which has NO synteny module —
+#   only the barplot and karyoplot. Synteny exists only in the GitHub tree.
+#   `pip install git+https://github.com/lorenzo-arcioni/BUSCO-Plot-Py` also
+#   fails: the repo has no package-discovery configuration and a top-level
+#   images/ directory, so setuptools refuses with "Multiple top-level packages
+#   discovered in a flat-layout". The package is pure Python with no build
+#   step, so this script clones it and puts the clone on PYTHONPATH, and
+#   installs only its three real dependencies (matplotlib, seaborn, pandas).
 # =============================================================================
 #SBATCH --job-name=grouse_buscoplots
 #SBATCH --output=logs/%x_%j.out
@@ -97,6 +110,10 @@ SYNTENY_HAPS=false
 
 # Comma-separated list of plot types to skip on a rerun: barplot,karyotype,synteny
 SKIP=""
+
+# Write an .svg beside every .png. Vector output is what you want for anything
+# going into a manuscript or the USFWS report; PNG stays for quick viewing.
+SAVE_SVG=true
 
 THREADS=$SLURM_CPUS_PER_TASK
 export MPLBACKEND=Agg          # belt and braces; the .py also forces it
@@ -192,6 +209,7 @@ ARGS=(
 if [[ -n "$SYNTENY_PAIRS" ]]; then ARGS+=(--synteny-pairs "$SYNTENY_PAIRS"); fi
 if [[ -n "$SKIP" ]];          then ARGS+=(--skip "$SKIP"); fi
 if [[ "$SYNTENY_HAPS" == true ]]; then ARGS+=(--synteny-haps); fi
+if [[ "$SAVE_SVG" != true ]]; then ARGS+=(--no-svg); fi
 
 echo ">>> Started: $(date)"
 "$PLOT_PYTHON" "$PLOT_SCRIPT" "${ARGS[@]}"
@@ -206,4 +224,5 @@ echo "  completeness : ${PLOT_DIR}/completeness/"
 echo "  karyotype    : ${PLOT_DIR}/karyotype/"
 echo "  synteny      : ${PLOT_DIR}/synteny/"
 find "$PLOT_DIR" -name '*.png' | wc -l | xargs printf "  %s PNG files written\n"
+find "$PLOT_DIR" -name '*.svg' | wc -l | xargs printf "  %s SVG files written\n"
 echo "============================================================"
