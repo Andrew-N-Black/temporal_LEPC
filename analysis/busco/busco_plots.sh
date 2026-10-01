@@ -87,10 +87,14 @@ BUSCOPLOTPY_REPO="https://github.com/lorenzo-arcioni/BUSCO-Plot-Py.git"
 PLOT_SCRIPT="${SLURM_SUBMIT_DIR}/04_busco_plots.py"
 
 # ---- Plot options -----------------------------------------------------------
-# Maximum chromosomes drawn per assembly. The final assemblies carry ~39 named
-# chromosomes plus unplaced scaffolds; only chr_* are ever plotted, and if
-# there are more than this the largest are kept.
-CHRS_LIMIT=40
+# Maximum chromosomes drawn per assembly. Only chr_* sequences are ever
+# plotted: ~39 autosomes plus Z, W and MT, so 42 at most. The default is set
+# above that deliberately. If an assembly exceeds this limit, the karyotype
+# plot keeps only the chromosomes with the most BUSCO hits, which would drop
+# real chromosomes from some assemblies and not others — and the comparison
+# between plots is the whole point. It still caps the SYNTENY panels, where
+# the largest chromosomes are kept for readability.
+CHRS_LIMIT=50
 
 # horizontal: the two assemblies stacked top and bottom (wide figure).
 # vertical:   side by side (tall figure).
