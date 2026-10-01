@@ -229,13 +229,19 @@ def read_summary(path, species, sample, hap, lineage=None):
     return df
 
 
+# Canonical chromosome order, applied identically to every assembly so that
+# plots can be compared row by row: numbered autosomes ascending, then Z, W,
+# MT, then any unplaced scaffolds.
+CHR_TAIL_ORDER = {"chr_Z": 0, "chr_W": 1, "chr_MT": 2}
+
+
 def natural_chr_key(name):
-    """chr_1 < chr_2 < ... < chr_33 < chr_W < chr_Z < chr_MT < scaffold_*."""
+    """chr_1 < chr_2 < ... < chr_39 < chr_Z < chr_W < chr_MT < scaffold_*."""
     m = re.fullmatch(r"chr_(\d+)", name)
     if m:
         return (0, int(m.group(1)), "")
     if name.startswith("chr_"):
-        return (1, {"chr_W": 0, "chr_Z": 1, "chr_MT": 2}.get(name, 3), name)
+        return (1, CHR_TAIL_ORDER.get(name, 3), name)
     return (2, 0, name)
 
 
@@ -313,8 +319,18 @@ def plot_karyotypes(assemblies, fulltables, final_dir, outdir, chrs_limit, svg=T
         # karyoplot renders karyotype['organism'][0] + ' ' + title, so `title`
         # must complement the organism label rather than repeat it.
         with also_save_svg(svg):
+            # selected_sequences is passed ALWAYS, and this is load-bearing.
+            # When an assembly has more chromosomes than chrs_limit, karyoplot
+            # otherwise re-sorts the karyotype by length descending AND keeps
+            # only the chrs_limit chromosomes with the most BUSCO hits — so
+            # assemblies with different chromosome counts came out in different
+            # row orders, with some chromosomes silently dropped. Supplying
+            # selected_sequences takes the branch that filters without
+            # reordering, so the canonical order built above survives and every
+            # assembly is plotted row-for-row comparable.
             karyoplot(karyotype=kt.copy(), fulltable=ft.copy(), output_file=out,
                       title=f"- BUSCO positions ({a['lineage'] or 'unknown lineage'})",
+                      selected_sequences=list(kt["sequence"]),
                       chrs_limit=chrs_limit, dpi=200)
         plt.close("all")
         made.append(os.path.basename(out))
