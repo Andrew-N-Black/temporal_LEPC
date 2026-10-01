@@ -15,6 +15,8 @@
 #   completeness/busco_barplot_ALL_completeness.png        all assemblies together
 #   karyotype/<SPECIES>_<SAMPLE>_<HAP>.png     one per assembly
 #   synteny/<A>__vs__<B>.png                   one per requested pair
+# Every PNG is accompanied by an .svg of the same name (vector, for figures
+# that will be scaled or edited); pass --no-svg to suppress.
 #
 # NOTES ON buscoplotpy's EXPECTATIONS (established by reading its source,
 # because they are not in the README):
@@ -44,6 +46,44 @@ from buscoplotpy.utils.load_json_summary import load_json_summary
 from buscoplotpy.graphics.organism_busco_barplot import organism_busco_barplot
 from buscoplotpy.graphics.karyoplot import karyoplot
 from buscoplotpy.graphics.synteny import horizontal_synteny_plot, vertical_synteny_plot
+
+import contextlib
+
+
+@contextlib.contextmanager
+def also_save_svg(enabled=True):
+    """
+    Write an .svg beside every .png the plotting functions produce.
+
+    All three buscoplotpy entry points call plt.savefig() with a hard-coded
+    .png path and then plt.close() before returning, so the figure is gone by
+    the time control comes back here. Wrapping plt.savefig for the duration of
+    the call is the only way to catch the figure while it is still current,
+    and it works identically for the barplot, karyoplot and synteny functions
+    without depending on their internals beyond "they call plt.savefig".
+    """
+    if not enabled:
+        yield
+        return
+    original = plt.savefig
+
+    def patched(fname, *args, **kwargs):
+        result = original(fname, *args, **kwargs)
+        try:
+            if isinstance(fname, (str, os.PathLike)):
+                path = str(fname)
+                if path.lower().endswith(".png"):
+                    original(path[:-4] + ".svg", *args, **kwargs)
+        except Exception as exc:                      # noqa: BLE001
+            print(f"    ! SVG companion failed for {fname}: {exc}", file=sys.stderr)
+        return result
+
+    plt.savefig = patched
+    try:
+        yield
+    finally:
+        plt.savefig = original
+
 
 SPECIES_COLORS = {"LEPC": "#8f5317", "GRPC": "#2f6f4e", "STGR": "#3a5a8c",
                   "GALGAL": "#6b6b6b"}   # Gallus gallus reference, for contrast
@@ -85,12 +125,31 @@ def find_assemblies(busco_dir):
         species, sample, hap = parsed
         summary = sorted(glob.glob(os.path.join(path, "short_summary.specific.*.json")))
         tables = sorted(glob.glob(os.path.join(path, "run_*", "full_table.tsv")))
+
+        # Lineage actually used, taken from BUSCO's own naming rather than from
+        # the JSON's lineage_dataset.name field, which has been observed to
+        # report a parent lineage (e.g. "vertebrata_odb10" on a run whose
+        # marker count, n=8338, is unambiguously aves_odb10). The run directory
+        # and the summary filename are both written from the dataset BUSCO
+        # really loaded, so they are the reliable source.
+        lineage = None
+        if tables:
+            run_dir = os.path.basename(os.path.dirname(tables[0]))
+            if run_dir.startswith("run_"):
+                lineage = run_dir[4:]
+        if lineage is None and summary:
+            m = re.match(r"short_summary\.specific\.([^.]+)\.",
+                         os.path.basename(summary[0]))
+            if m:
+                lineage = m.group(1)
+
         out.append({
             "name": os.path.basename(path),
             "species": species, "sample": sample, "hap": hap,
             "dir": path,
             "summary_json": summary[0] if summary else None,
             "full_table": tables[0] if tables else None,
+            "lineage": lineage,
         })
     return out
 
@@ -133,7 +192,7 @@ def read_fulltable(path, species, sample, hap):
     return ft
 
 
-def read_summary(path, species, sample, hap):
+def read_summary(path, species, sample, hap, lineage=None):
     """
     load_json_summary() indexes a fixed set of JSON keys and raises KeyError if
     the run used a different gene predictor. Fall back to the keys the barplot
@@ -153,6 +212,16 @@ def read_summary(path, species, sample, hap):
             "multi copy": r["Multi copy"], "fragmented": r["Fragmented"],
             "missing": r["Missing"], "n_markers": r["n_markers"],
         }, index=[0])
+
+    # The barplot titles itself with dataset_name. Prefer the lineage taken
+    # from BUSCO's run directory / summary filename, and say so loudly when the
+    # JSON disagrees rather than silently mislabelling every figure.
+    if lineage:
+        reported = str(df["dataset_name"].iloc[0])
+        if reported != lineage:
+            print(f"    note: JSON reports lineage '{reported}' but the BUSCO run is "
+                  f"'{lineage}' (n={df['n_markers'].iloc[0]}); using '{lineage}'")
+        df["dataset_name"] = lineage
 
     df["group"] = species
     df["organism"] = sample
@@ -194,7 +263,7 @@ def build_karyotype(fai_path, organism_label, color, chrom_only=True, limit=None
 
 
 # -------------------------------------------------------------------- plots --
-def plot_barplots(assemblies, summaries, outdir):
+def plot_barplots(assemblies, summaries, outdir, svg=True):
     os.makedirs(outdir, exist_ok=True)
     made = []
     for species in SPECIES_ORDER:
@@ -203,8 +272,9 @@ def plot_barplots(assemblies, summaries, outdir):
         if not rows:
             continue
         df = pd.concat(rows, ignore_index=True)
-        organism_busco_barplot(df=df, group_name=species, out_path=outdir + os.sep,
-                               filename=f"busco_barplot_{species}", dpi=200)
+        with also_save_svg(svg):
+            organism_busco_barplot(df=df, group_name=species, out_path=outdir + os.sep,
+                                   filename=f"busco_barplot_{species}", dpi=200)
         plt.close("all")
         # organism_busco_barplot appends "_completeness.png" to `filename`.
         made.append(f"busco_barplot_{species}_completeness.png ({len(df)} assemblies)")
@@ -216,14 +286,15 @@ def plot_barplots(assemblies, summaries, outdir):
         # species into 'organism' to keep the combined panel unambiguous.
         df = df.copy()
         df["organism"] = df["group"] + "_" + df["organism"]
-        organism_busco_barplot(df=df, group_name="all species", out_path=outdir + os.sep,
-                               filename="busco_barplot_ALL", dpi=200)
+        with also_save_svg(svg):
+            organism_busco_barplot(df=df, group_name="all species", out_path=outdir + os.sep,
+                                   filename="busco_barplot_ALL", dpi=200)
         plt.close("all")
         made.append(f"busco_barplot_ALL_completeness.png ({len(df)} assemblies)")
     return made
 
 
-def plot_karyotypes(assemblies, fulltables, final_dir, outdir, chrs_limit):
+def plot_karyotypes(assemblies, fulltables, final_dir, outdir, chrs_limit, svg=True):
     os.makedirs(outdir, exist_ok=True)
     made, skipped = [], []
     for a in assemblies:
@@ -241,15 +312,17 @@ def plot_karyotypes(assemblies, fulltables, final_dir, outdir, chrs_limit):
         # karyoplot lowercases and may reindex the frame it is handed, so pass a copy.
         # karyoplot renders karyotype['organism'][0] + ' ' + title, so `title`
         # must complement the organism label rather than repeat it.
-        karyoplot(karyotype=kt.copy(), fulltable=ft.copy(), output_file=out,
-                  title="- BUSCO positions",
-                  chrs_limit=chrs_limit, dpi=200)
+        with also_save_svg(svg):
+            karyoplot(karyotype=kt.copy(), fulltable=ft.copy(), output_file=out,
+                      title=f"- BUSCO positions ({a['lineage'] or 'unknown lineage'})",
+                      chrs_limit=chrs_limit, dpi=200)
         plt.close("all")
         made.append(os.path.basename(out))
     return made, skipped
 
 
-def plot_synteny(pairs, assemblies, fulltables, final_dir, outdir, orientation, chrs_limit):
+def plot_synteny(pairs, assemblies, fulltables, final_dir, outdir, orientation,
+                 chrs_limit, svg=True):
     os.makedirs(outdir, exist_ok=True)
     by_name = {a["name"]: a for a in assemblies}
     fn = horizontal_synteny_plot if orientation == "horizontal" else vertical_synteny_plot
@@ -288,10 +361,11 @@ def plot_synteny(pairs, assemblies, fulltables, final_dir, outdir, orientation, 
         # The plot renders karyotype_1['organism'][0] + ' - ' +
         # karyotype_2['organism'][0] + ' ' + title, so `title` must not repeat
         # the two names.
-        fn(ft_1=ft1.copy(), ft_2=ft2.copy(),
-           karyotype_1=kt1.copy(), karyotype_2=kt2.copy(),
-           title="- shared Complete BUSCOs", link_colors=link_colors,
-           output_path=out, dpi=200)
+        with also_save_svg(svg):
+            fn(ft_1=ft1.copy(), ft_2=ft2.copy(),
+               karyotype_1=kt1.copy(), karyotype_2=kt2.copy(),
+               title="- shared Complete BUSCOs", link_colors=link_colors,
+               output_path=out, dpi=200)
         plt.close("all")
         made.append(f"{os.path.basename(out)} ({shared} shared Complete BUSCOs)")
     return made, skipped
@@ -339,9 +413,12 @@ def main():
     p.add_argument("--synteny-haps", action="store_true",
                    help="also plot hap1 vs hap2 for every individual")
     p.add_argument("--skip", default="", help="comma-separated: barplot,karyotype,synteny")
+    p.add_argument("--no-svg", action="store_true",
+                   help="write PNG only; by default an SVG is written beside every PNG")
     args = p.parse_args()
 
     skip = {s.strip() for s in args.skip.split(",") if s.strip()}
+    svg = not args.no_svg
 
     assemblies = find_assemblies(args.busco_dir)
     if not assemblies:
@@ -358,7 +435,7 @@ def main():
     for a in assemblies:
         if a["summary_json"]:
             summaries[a["name"]] = read_summary(a["summary_json"], a["species"],
-                                                a["sample"], a["hap"])
+                                                a["sample"], a["hap"], a["lineage"])
         else:
             print(f"    ! {a['name']}: no short_summary JSON")
         if a["full_table"]:
@@ -373,14 +450,14 @@ def main():
     if "barplot" not in skip:
         print(">>> Completeness barplots")
         for line in plot_barplots(assemblies, summaries,
-                                  os.path.join(args.out_dir, "completeness")):
+                                  os.path.join(args.out_dir, "completeness"), svg=svg):
             print("    " + line)
 
     if "karyotype" not in skip:
         print(">>> Karyotype plots")
         made, skipped = plot_karyotypes(assemblies, fulltables, args.final_dir,
                                         os.path.join(args.out_dir, "karyotype"),
-                                        args.chrs_limit)
+                                        args.chrs_limit, svg=svg)
         print(f"    {len(made)} written")
         for s in skipped:
             print(f"    skipped: {s}")
@@ -396,7 +473,7 @@ def main():
         print(f"    {len(pairs)} pair(s)")
         made, skipped = plot_synteny(pairs, assemblies, fulltables, args.final_dir,
                                      os.path.join(args.out_dir, "synteny"),
-                                     args.synteny_orientation, args.chrs_limit)
+                                     args.synteny_orientation, args.chrs_limit, svg=svg)
         for m in made:
             print("    " + m)
         for s in skipped:
