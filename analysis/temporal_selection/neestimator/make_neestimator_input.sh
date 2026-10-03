@@ -52,27 +52,41 @@ cd "$OUTDIR"
 cut -f1 "$POPMAP" > samples_unrelated.txt
 PREFIX=lepc_auto_unrel
 
-echo "[1-3] subset samples, per-era call rate, missingness, MAF: $(date)"
-bcftools view --threads "$THREADS" -S samples_unrelated.txt -a -Ou "$VCF" \
-  | bcftools view --threads "$THREADS" -m2 -M2 -v snps -Ou \
-  | bcftools +fill-tags -Ou -- -S "$POPMAP" -t AN,AC,MAF \
-  | bcftools view --threads "$THREADS" \
-        -i "INFO/AN_Past>=${MIN_AN_PER_ERA} && INFO/AN_Present>=${MIN_AN_PER_ERA} && F_MISSING<${MAX_MISSING} && INFO/MAF>=${MAF}" \
-        -Oz -o ${PREFIX}.filt.vcf.gz
-bcftools index -t -f ${PREFIX}.filt.vcf.gz
-echo "    sites after filtering: $(bcftools index -n ${PREFIX}.filt.vcf.gz)"
+FILT=${PREFIX}.filt.vcf.gz
+THINNED=${PREFIX}.thin${THIN}.vcf.gz
 
-echo "[4] thin: 1 random SNP per ${THIN}: $(date)"
-bcftools +prune -n 1 -w "$THIN" -N rand --random-seed "$SEED" \
-    ${PREFIX}.filt.vcf.gz -Oz -o ${PREFIX}.thin${THIN}.vcf.gz
-bcftools index -t -f ${PREFIX}.thin${THIN}.vcf.gz
-NSNP=$(bcftools index -n ${PREFIX}.thin${THIN}.vcf.gz)
-echo "    sites after thinning: $NSNP"
+# Steps 1-4 are skipped if their outputs already exist (delete them to redo).
+if [[ ! -s "$FILT" ]]; then
+    echo "[1-3] subset samples, per-era call rate, missingness, MAF: $(date)"
+    bcftools view --threads "$THREADS" -S samples_unrelated.txt -a -Ou "$VCF" \
+      | bcftools view --threads "$THREADS" -m2 -M2 -v snps -Ou \
+      | bcftools +fill-tags -Ou -- -S "$POPMAP" -t AN,AC,MAF \
+      | bcftools view --threads "$THREADS" \
+            -i "INFO/AN_Past>=${MIN_AN_PER_ERA} && INFO/AN_Present>=${MIN_AN_PER_ERA} && F_MISSING<${MAX_MISSING} && INFO/MAF>=${MAF}" \
+            -Oz -o "$FILT"
+    bcftools index -t -f "$FILT"
+fi
+echo "    sites after filtering: $(bcftools index -n "$FILT")"
+
+if [[ ! -s "$THINNED" ]]; then
+    echo "[4] thin: 1 random SNP per ${THIN}: $(date)"
+    bcftools +prune -n 1 -w "$THIN" -N rand --random-seed "$SEED" \
+        "$FILT" -Oz -o "$THINNED"
+    bcftools index -t -f "$THINNED"
+fi
+echo "    sites after thinning: $(bcftools index -n "$THINNED")"
 
 echo "[5] write GENEPOP: $(date)"
+# bcftools is a module shell function here, invisible to Python's subprocess,
+# so the genotype dump is done in this shell and handed to the converter.
+bcftools query -l "$THINNED" > ${PREFIX}.thin${THIN}.samples.txt
+bcftools query -f '%CHROM:%POS[\t%GT]\n' "$THINNED" > ${PREFIX}.thin${THIN}.geno.tsv
 python3 "${SLURM_SUBMIT_DIR:-$PWD}/vcf2genepop.py" \
-    --vcf ${PREFIX}.thin${THIN}.vcf.gz --popmap "$POPMAP" \
+    --samples ${PREFIX}.thin${THIN}.samples.txt \
+    --geno ${PREFIX}.thin${THIN}.geno.tsv \
+    --popmap "$POPMAP" \
     --out ${PREFIX}.thin${THIN}.gen --order Past,Present
+rm -f ${PREFIX}.thin${THIN}.geno.tsv
 
 echo "Done. Copy to your Mac with:"
 echo "  scp $(whoami)@gautschi.rcac.purdue.edu:$OUTDIR/${PREFIX}.thin${THIN}.gen ~/NeEstimator2.X/"

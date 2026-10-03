@@ -9,15 +9,16 @@ generation set (e.g. 0 5) to them in that order.
 
 Genotype coding: REF = 01, ALT = 02, missing = 0000 (2-digit alleles).
 
-Usage:
-  bcftools query -l filtered.vcf.gz > samples.txt   # (only needed for checking)
-  python3 vcf2genepop.py --vcf filtered.vcf.gz --popmap popmap_unrelated.txt \
-          --out lepc_temporal.gen [--order Past,Present]
+bcftools is NOT called from here: on Gautschi the biocontainer bcftools is a
+module shell function that a Python subprocess cannot see. Dump the VCF with
+bcftools in the calling shell instead:
 
-Requires bcftools on PATH (reads the VCF through `bcftools query`).
+  bcftools query -l thinned.vcf.gz > samples.txt
+  bcftools query -f '%CHROM:%POS[\t%GT]\n' thinned.vcf.gz > genotypes.tsv
+  python3 vcf2genepop.py --samples samples.txt --geno genotypes.tsv \
+          --popmap popmap_unrelated.txt --out lepc_temporal.gen
 """
 import argparse
-import subprocess
 import sys
 
 CODE = {"0": "01", "1": "02"}
@@ -25,7 +26,9 @@ CODE = {"0": "01", "1": "02"}
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--vcf", required=True)
+    ap.add_argument("--samples", required=True, help="bcftools query -l output")
+    ap.add_argument("--geno", required=True,
+                    help="bcftools query genotype dump: CHROM:POS then one GT per sample")
     ap.add_argument("--popmap", required=True, help="<sample> <group>, no header")
     ap.add_argument("--out", required=True)
     ap.add_argument("--order", default="Past,Present",
@@ -40,9 +43,8 @@ def main():
             if len(f) >= 2:
                 group[f[0]] = f[1]
 
-    vcf_samples = subprocess.run(["bcftools", "query", "-l", a.vcf],
-                                 check=True, capture_output=True,
-                                 text=True).stdout.split()
+    with open(a.samples) as fh:
+        vcf_samples = fh.read().split()
     missing = [s for s in vcf_samples if s not in group]
     if missing:
         sys.exit(f"ERROR: samples in VCF but not in popmap: {missing}")
@@ -52,9 +54,8 @@ def main():
 
     loci = []
     geno = {s: [] for s in vcf_samples}
-    q = subprocess.Popen(["bcftools", "query", "-f", "%CHROM:%POS[\t%GT]\n", a.vcf],
-                         stdout=subprocess.PIPE, text=True)
-    for line in q.stdout:
+    fh = open(a.geno)
+    for line in fh:
         f = line.rstrip("\n").split("\t")
         loci.append(f[0])
         for s, gt in zip(vcf_samples, f[1:]):
@@ -63,8 +64,9 @@ def main():
                 geno[s].append(CODE[al[0]] + CODE[al[1]])
             else:
                 geno[s].append("0000")
-    if q.wait() != 0:
-        sys.exit("ERROR: bcftools query failed")
+    fh.close()
+    if not loci:
+        sys.exit("ERROR: no genotype rows in " + a.geno)
 
     with open(a.out, "w") as out:
         out.write(f"LEPC temporal: {len(loci)} SNPs, groups {','.join(order)}\n")
