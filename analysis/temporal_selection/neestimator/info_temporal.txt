@@ -7,4 +7,4 @@ lepc_temporal_Ne_t5.txt           * Output file name
 1                                 * Number of critical values
 0.05 -1                           * Pcrit (lowest allele freq used); -1 = don't also run Pcrit = 0
 0                                 * Mating model (LD method only; ignored here)
-0 0 5                             * Census size (0 = Plan II), then generation of each sample
+0 0 2.63                          * Census size (0 = Plan II), then generation of each sample
