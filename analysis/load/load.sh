@@ -19,6 +19,9 @@
 #     effectively binary, and element-level calls (gerpelem) did not enrich
 #     missense over synonymous variants. The archived GERP version of this
 #     pipeline is kept separately if a deeper alignment is ever built.
+#   - Missense variants are not split by severity. A Grantham-distance
+#     radical/conservative split was tried and removed (2026-10); missense
+#     is reported as a single SnpEff MODERATE class.
 #   - Load is reported as total / realized / masked per individual per
 #     category, following the standard decomposition.
 # =============================================================================
@@ -359,18 +362,6 @@ for IMPACT in HIGH MODERATE LOW MODIFIER; do
     echo "  ${IMPACT}: $(wc -l < OUT/snpeff/sites_${IMPACT}.txt) sites"
 done
 
-# Amino-acid change per missense variant, for Grantham scoring in Step 5.
-# ANN subfields are pipe-separated; subfield 11 is HGVS.p (e.g. p.Ala123Val).
-# Only the first (primary) annotation per variant is used.
-bcftools view -i "INFO/ANN[*] ~ 'MODERATE'" OUT/snpeff/lepc_snpeff.vcf.gz | \
-    bcftools query -f '%CHROM\t%POS\t%INFO/ANN\n' | \
-    awk -F'\t' 'BEGIN{OFS="\t"} {
-        split($3, anns, ",")
-        split(anns[1], f, "|")
-        if (f[11] != "") print $1, $2, f[11]
-    }' > OUT/snpeff/missense_aa_changes.tsv
-echo "  amino-acid changes extracted: $(wc -l < OUT/snpeff/missense_aa_changes.tsv)"
-
 echo "Step 2 complete: $(date)"
 EOF
 
@@ -605,100 +596,10 @@ high     = load_site_set("%s/snpeff/sites_HIGH.txt" % out)
 moderate = load_site_set("%s/snpeff/sites_MODERATE.txt" % out)
 low      = load_site_set("%s/snpeff/sites_LOW.txt" % out)
 
-# ---------------------------------------------------------------------------
-# Grantham (1974) physicochemical distance for missense variants.
-#
-# This grades how chemically different the substituted amino acids are
-# (composition, polarity, molecular volume). It is NOT a conservation or
-# deleteriousness score -- it needs no alignment, so it is unaffected by the
-# tree-depth problem that ruled out GERP, but it is correspondingly weaker
-# evidence. Report it as a severity gradient, not as a deleterious call.
-#
-# Distances are computed from Grantham's published formula rather than a
-# transcribed matrix; the implementation reproduces published pair values to
-# within rounding (e.g. Leu-Ile 4.9 vs 5, Cys-Trp 214.4 vs 215).
-# ---------------------------------------------------------------------------
-AA_PROPS = {
-    "A": (0.00,  8.1,  31.0), "R": (0.65, 10.5, 124.0), "N": (1.33, 11.6,  56.0),
-    "D": (1.38, 13.0,  54.0), "C": (2.75,  5.5,  55.0), "Q": (0.89, 10.5,  85.0),
-    "E": (0.92, 12.3,  83.0), "G": (0.74,  9.0,   3.0), "H": (0.58, 10.4,  96.0),
-    "I": (0.00,  5.2, 111.0), "L": (0.00,  4.9, 111.0), "K": (0.33, 11.3, 119.0),
-    "M": (0.00,  5.7, 105.0), "F": (0.00,  5.2, 132.0), "P": (0.39,  8.0,  32.5),
-    "S": (1.42,  9.2,  32.0), "T": (0.71,  8.6,  61.0), "W": (0.13,  5.4, 170.0),
-    "Y": (0.20,  6.2, 136.0), "V": (0.00,  5.9,  84.0),
-}
-ALPHA, BETA, GAMMA, RHO = 1.833, 0.1018, 0.000399, 50.723
-
-
-def grantham(aa1, aa2):
-    if aa1 not in AA_PROPS or aa2 not in AA_PROPS:
-        return None
-    c1, p1, v1 = AA_PROPS[aa1]
-    c2, p2, v2 = AA_PROPS[aa2]
-    return RHO * math.sqrt(ALPHA * (c1 - c2) ** 2
-                           + BETA * (p1 - p2) ** 2
-                           + GAMMA * (v1 - v2) ** 2)
-
-
-THREE_TO_ONE = {
-    "Ala": "A", "Arg": "R", "Asn": "N", "Asp": "D", "Cys": "C", "Gln": "Q",
-    "Glu": "E", "Gly": "G", "His": "H", "Ile": "I", "Leu": "L", "Lys": "K",
-    "Met": "M", "Phe": "F", "Pro": "P", "Ser": "S", "Thr": "T", "Trp": "W",
-    "Tyr": "Y", "Val": "V",
-}
-
-HGVS_P = re.compile(r"^p\.([A-Z][a-z]{2})(\d+)([A-Z][a-z]{2})$")
-
-aa_path = "%s/snpeff/missense_aa_changes.tsv" % out
-distances = {}
-n_parsed = n_unparsed = 0
-if os.path.exists(aa_path) and os.path.getsize(aa_path) > 0:
-    with open(aa_path) as fh:
-        for line in fh:
-            fields = line.rstrip("\n").split("\t")
-            if len(fields) < 3:
-                continue
-            contig, position, hgvs = fields[0], fields[1], fields[2]
-            matched = HGVS_P.match(hgvs)
-            if not matched:
-                # frameshift / extension / unknown notations, etc.
-                n_unparsed += 1
-                continue
-            a1 = THREE_TO_ONE.get(matched.group(1))
-            a2 = THREE_TO_ONE.get(matched.group(3))
-            if a1 is None or a2 is None:
-                n_unparsed += 1
-                continue
-            distance = grantham(a1, a2)
-            if distance is None:
-                n_unparsed += 1
-                continue
-            distances[contig + ":" + position] = distance
-            n_parsed += 1
-else:
-    print("WARNING: no missense_aa_changes.tsv found -- rerun Step 2 to "
-          "produce it; Grantham columns will be empty.")
-
-
-def grantham_class(distance):
-    """Grantham's own conventional bins."""
-    if distance is None:
-        return ""
-    if distance <= 50:
-        return "conservative"
-    if distance <= 100:
-        return "moderately_conservative"
-    if distance <= 150:
-        return "moderately_radical"
-    return "radical"
-
-
 source_path = "%s/polarized/sites_polarized.tsv" % out
 sink_path = "%s/load/sites_classified.tsv" % out
 
 category_counts = Counter()
-class_counts = Counter()
-n_missense = n_missense_scored = 0
 
 # Streamed row by row rather than loaded into a dataframe: this file has
 # millions of rows and the classification is purely per-site.
@@ -707,7 +608,7 @@ with open(source_path, newline="") as src, open(sink_path, "w", newline="") as s
     if reader.fieldnames is None:
         sys.exit("ERROR: %s is empty -- did Step 4 finish?" % source_path)
     added = ["site", "snpeff_HIGH", "snpeff_MODERATE", "snpeff_LOW",
-             "category", "grantham", "grantham_class", "category_fine"]
+             "category"]
     writer = csv.DictWriter(sink, fieldnames=list(reader.fieldnames) + added,
                             delimiter="\t", lineterminator="\n",
                             extrasaction="ignore")
@@ -732,19 +633,6 @@ with open(source_path, newline="") as src, open(sink_path, "w", newline="") as s
         if is_high:
             category = "LOF"
 
-        distance = distances.get(site)
-        category_fine = category
-        if category == "MISSENSE":
-            n_missense += 1
-            if distance is not None:
-                n_missense_scored += 1
-                # Split at Grantham 100, the usual conservative/radical
-                # division. Missense with no parseable amino-acid change
-                # keeps the unsplit MISSENSE label rather than being guessed at.
-                category_fine = ("MISSENSE_CONSERVATIVE" if distance <= 100
-                                 else "MISSENSE_RADICAL")
-            class_counts[grantham_class(distance)] += 1
-
         category_counts[category] += 1
 
         row["site"] = site
@@ -752,22 +640,11 @@ with open(source_path, newline="") as src, open(sink_path, "w", newline="") as s
         row["snpeff_MODERATE"] = is_moderate
         row["snpeff_LOW"] = is_low
         row["category"] = category
-        row["grantham"] = "" if distance is None else "%.6f" % distance
-        row["grantham_class"] = grantham_class(distance)
-        row["category_fine"] = category_fine
         writer.writerow(row)
 
-print("Amino-acid changes scored: %d; unparseable/skipped: %d"
-      % (n_parsed, n_unparsed))
-print("Missense sites: %d; with a Grantham score: %d (%.1f%%)"
-      % (n_missense, n_missense_scored,
-         100.0 * n_missense_scored / max(n_missense, 1)))
 print("\nSite categories:")
 for name, count in category_counts.most_common():
     print("  %-10s %d" % (name, count))
-print("\nGrantham class (missense only):")
-for name, count in class_counts.most_common():
-    print("  %-25s %d" % (name if name else "(unscored)", count))
 PYEOF
 
 echo "Step 5 complete: $(date)"
@@ -919,23 +796,11 @@ cat(sprintf("Analysing %d samples (%d Old, %d New)\n", length(analysis_samples),
 site_lookup <- sites %>%
     mutate(site = paste(chrom, pos, sep = ":"),
            derived_is_alt = derived == alt) %>%
-    select(site, category, category_fine, derived_is_alt)
-
-# Report BOTH the aggregate MISSENSE class and its Grantham split. A site
-# contributes to its coarse category and, if scored, to its fine category,
-# so MISSENSE totals stay complete while RADICAL/CONSERVATIVE are also
-# available. Rows are duplicated only where the two labels differ.
-site_lookup <- bind_rows(
-    site_lookup %>% select(site, category, derived_is_alt),
-    site_lookup %>%
-        filter(category_fine != category) %>%
-        mutate(category = category_fine) %>%
-        select(site, category, derived_is_alt)
-)
+    select(site, category, derived_is_alt)
 
 results <- list()
 
-for (cat in c("LOF", "MISSENSE", "MISSENSE_RADICAL", "MISSENSE_CONSERVATIVE", "NEUTRAL")) {
+for (cat in c("LOF", "MISSENSE", "NEUTRAL")) {
     cat_sites <- site_lookup %>% filter(category == cat)
     if (nrow(cat_sites) == 0) next
 
@@ -975,6 +840,7 @@ for (cat in c("LOF", "MISSENSE", "MISSENSE_RADICAL", "MISSENSE_CONSERVATIVE", "N
             individual     = ind,
             group          = group_map[[ind]],
             category       = cat,
+            n_sites_class  = nrow(cat_sites),   # sites in class (for call rate)
             n_sites        = n_sites,
             n_het_derived  = n_het_der,
             n_hom_derived  = n_hom_der,

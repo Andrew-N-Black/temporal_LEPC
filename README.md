@@ -103,8 +103,8 @@ Numbers below are logical order, not filenames.
    genotypes) with `ROH/ROHan/rohan_parse_autosomal.sh`. Both parsers
    re-parse already-computed output -- neither ANGSD/bcftools roh nor
    ROHan itself needs to be re-run.
-9. **Genetic load** -- `load/load.sh`. Current methodology (SnpEff +
-   Grantham, no GERP) but not yet on the autosomal/unrelated dataset --
+9. **Genetic load** -- `load/load.sh`. Current methodology (SnpEff
+   impact classes only; no GERP, no Grantham split) but not yet on the autosomal/unrelated dataset --
    see AUDIT.md item 1.
 10. **Site classification** -- `temporal_selection/make_siteclass.sh`
     (SnpEff ANN -> deleterious/neutral sites, optional GERP support).

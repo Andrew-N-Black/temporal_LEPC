@@ -1,0 +1,10 @@
+8                                 * Method: Temporal only (LD=1, Het=2, Coan=4, Temporal=8)
+./                                * Input directory (./ = the folder you run Ne2x from)
+lepc_auto_unrel.thin10kb.gen      * Input file name
+2                                 * 1 = FSTAT format, 2 = GENEPOP format
+./                                * Output directory
+lepc_temporal_Ne_t5.txt           * Output file name
+1                                 * Number of critical values
+0.05 -1                           * Pcrit (lowest allele freq used); -1 = don't also run Pcrit = 0
+0                                 * Mating model (LD method only; ignored here)
+0 0 5                             * Census size (0 = Plan II), then generation of each sample

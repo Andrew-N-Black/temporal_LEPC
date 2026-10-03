@@ -82,9 +82,9 @@ qual_df$era  <- era(qual_df$group)
 LAB <- c(LOF = "Loss-of-\nfunction",
          MISSENSE = "Missense",
          NEUTRAL = "Neutral")
-# The Grantham radical/conservative split is not used: missense is treated as a
-# single class. Step 6 still writes MISSENSE_RADICAL and MISSENSE_CONSERVATIVE
-# rows, and these class vectors simply do not select them.
+# The Grantham radical/conservative split was removed from load.sh (2026-10):
+# missense is a single class. Output from older runs may still carry
+# MISSENSE_RADICAL / MISSENSE_CONSERVATIVE rows; these vectors ignore them.
 DISJOINT <- c("LOF", "MISSENSE", "NEUTRAL")
 DELET    <- c("LOF", "MISSENSE")
 

@@ -12,7 +12,8 @@ resolved items are condensed to one line; open items keep full detail.
 ### 1. `analysis/load/load.sh` is on the whole-genome, all-20-sample dataset
 
 The genetic load pipeline's *methodology* is current and correct (SnpEff
-impact + Grantham distance, GERP++ evaluated and deliberately dropped —
+impact classes only; GERP++ and a Grantham radical/conservative split were
+both evaluated and deliberately dropped —
 see the script's own header). But it isn't on the same dataset as every
 other analysis in this repo: `VCF` has no `.auto` in its name (unlike
 `remove_Z_scaffolds.sh`'s output and everything downstream of it), there's
@@ -93,7 +94,7 @@ restore -- worth checking its source project's own repo.
   earlier pass have since been added directly: `relatedness_vcf.py`,
   `run_lepc_relatedness.sh`, `popmap.txt`, `popmap_unrelated.txt`.
 - **`load.sh` was the pre-revision (GERP-based) draft** -- since replaced
-  with the current SnpEff+Grantham methodology (see Open item 1 above for
+  with the current SnpEff-impact methodology (see Open item 1 above for
   what's still outstanding on the *dataset* it points to).
 - **`outflank_drift.sh`'s `FILT_VCF`** produced a redundant filename
   (`...auto.biallelic.snps.AUTO.vcf.gz`); simplified.
