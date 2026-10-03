@@ -37,7 +37,14 @@ MIN_AN_PER_ERA=10     # = 5 diploid birds genotyped per era
 SEED=42
 THREADS=${SLURM_CPUS_PER_TASK:-4}
 
-module load bcftools 2>/dev/null || true
+# bcftools on Gautschi comes from biocontainers (same setup as load.sh Step 6).
+module --force purge
+module load biocontainers
+module load bcftools
+# xalt injects LD_PRELOAD into containerised commands; blank it or bcftools
+# aborts with "GLIBC_2.33/2.34 not found (required by libxalt_init.so)".
+export SINGULARITYENV_LD_PRELOAD=""
+export APPTAINERENV_LD_PRELOAD=""
 command -v bcftools >/dev/null || { echo "bcftools not found" >&2; exit 1; }
 
 mkdir -p "$OUTDIR" logs
