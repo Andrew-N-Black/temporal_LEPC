@@ -20,15 +20,15 @@
 #SBATCH --job-name=old_new_bcftools_roh
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A dewoody
-#SBATCH -t 3-00:00:00
+#SBATCH -A fnrdewoody
+#SBATCH -t 6-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=64
-#SBATCH --mem=250G
-#SBATCH -p cpu
+#SBATCH --mem=140G
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=blackan@purdue.edu
+#SBATCH -p cpu
 
 set -euo pipefail
 
@@ -71,6 +71,10 @@ ml htslib
 # xalt is sticky and re-injects it):
 export SINGULARITYENV_LD_PRELOAD=""
 export APPTAINERENV_LD_PRELOAD=""
+CACHE=${CLUSTER_SCRATCH}/GROUSE/old_vs_new/ref/hts-cache
+export REF_CACHE="$CACHE/%2s/%2s/%s" REF_PATH="$CACHE/%2s/%2s/%s"
+export SINGULARITYENV_REF_CACHE="$REF_CACHE" SINGULARITYENV_REF_PATH="$REF_PATH"
+export APPTAINERENV_REF_CACHE="$REF_CACHE" APPTAINERENV_REF_PATH="$REF_PATH"
 
 # =============================================================================
 # STEP 1: ANGSD genome-wide variant calling -> BCF (flags match ROH.sh
