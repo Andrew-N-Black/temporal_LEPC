@@ -16,7 +16,7 @@ library(reshape2)
 library(ggplot2)
 
 #read in metadata
-metadata <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/sarek_old_new/old_new_heterozygosity.xlsx")
+metadata <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata.xlsx)
 
 #Extract relevant information
 sub<-metadata[,c("ID","GRP","fROH_100kb-1Mb","fROH_1Mb","fROH_total")]
