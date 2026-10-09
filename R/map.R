@@ -22,7 +22,7 @@ library(ggspatial)
 library(svglite)
 
 # --- 1. Load data ---------------------------------------------------------
-df <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/sarek_old_new/old_new_heterozygosity_unrel.xlsx")
+df <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata.xlsx)
 
 # --- 2. Robust GPS parsing -------------------------------------------------
 # Grabs the first decimal number (latitude) and the trailing negative
