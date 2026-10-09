@@ -2,8 +2,8 @@ library(tidyverse)
 library(dplyr)
 
 metadata <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata_unrelated.xlsx")
-eigenvec <- read.table("joint_germline_auto_unrel.pca.eigenvec", header = FALSE)
-eigenval <- scan("joint_germline_auto_unrel.pca.eigenval")
+eigenvec <- read.table("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/joint_germline_auto_unrel.pca.eigenvec", header = FALSE)
+eigenval <- scan("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/joint_germline_auto_unrel.pca.eigenval")
 
 colnames(eigenvec) <- c("IID", paste0("PC", 1:(ncol(eigenvec) - 1)))
 pve <- round(eigenval / sum(eigenval) * 100, 1)
