@@ -8,7 +8,7 @@ library(reshape2)
 library(ggplot2)
 
 # Read in metadata
-metadata <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/sarek_old_new/old_new_heterozygosity.xlsx")
+metadata <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata.xlsx")
 
 # Extract fROH columns from both methods
 froh_cols <- c("fROH_100kb-1Mb", "fROH_1Mb", "fROH_total",
