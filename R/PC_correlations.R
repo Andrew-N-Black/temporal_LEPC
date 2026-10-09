@@ -4,7 +4,7 @@ library(ggplot2)
 
 COV_FILE   <- "~/final_autosomal_unrel.cov"
 ORDER_FILE <- "~/final_cramlist_unrel.txt"
-META_FILE  <- "/Users/andrewblack/Documents/Research/GROUSE/sarek_old_new/old_new_heterozygosity_unrel.xlsx"
+META_FILE  <- "/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata.xlsx"
 QC_FILE    <- "~/vcf_samples.tsv"
 META_ID    <- "ID"    # <- name of the sample-ID column in META_FILE (e.g. "F17")
 META_DEPTH <- "DOC"   # <- name of the depth column in META_FILE
