@@ -19,7 +19,7 @@ library(dplyr)
 
 #By DPS and Species
 #load metadata
-HET_FILT <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/sarek_old_new/old_new_heterozygosity.xlsx")
+HET_FILT <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata.xlsx")
 #Plot
 ggplot(HET_FILT, aes(x=GRP, y=heterozygosity_angsd, fill=GRP)) +
     geom_boxplot() +
