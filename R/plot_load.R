@@ -14,8 +14,8 @@ suppressPackageStartupMessages({
     library(tidyverse)
 })
 
-LOAD_TSV <- "genetic_load_per_individual.tsv"      # copy from $OUT/load/ on Gautschi
-POPMAP   <- "processing/popmap_unrelated.txt"
+LOAD_TSV <- "/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/genetic_load_per_individual.tsv"      
+POPMAP   <- "/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/popmap_unrelated.txt"
 OUTDIR   <- "load_report"
 dir.create(OUTDIR, showWarnings = FALSE)
 
