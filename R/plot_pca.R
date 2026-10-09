@@ -6,7 +6,7 @@ library(ggplot2)
 HET_FILT <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata_unrelated.xlsx ")
 
 #Read in covariation matrix (rows follow final_cramlist_unrel.txt, NOT the spreadsheet)
-cov <- as.matrix(read.table("~/final_autosomal_unrel.cov"))
+cov <- as.matrix(read.table("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/final_autosomal_unrel.cov"))
 stopifnot(nrow(cov) == nrow(HET_FILT))   # 19 and 19
 
 #Check sample order: the .cov rows follow final_cramlist_unrel.txt.
