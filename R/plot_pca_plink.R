@@ -1,7 +1,7 @@
 library(tidyverse)
 library(dplyr)
 
-metadata <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/sarek_old_new/old_new_heterozygosity_unrel.xlsx")
+metadata <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata_unrelated.xlsx")
 eigenvec <- read.table("joint_germline_auto_unrel.pca.eigenvec", header = FALSE)
 eigenval <- scan("joint_germline_auto_unrel.pca.eigenval")
 
