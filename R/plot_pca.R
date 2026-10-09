@@ -3,7 +3,7 @@ library(readxl)
 library(ggplot2)
 
 #Read in metadata
-HET_FILT <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/sarek_old_new/old_new_heterozygosity_unrel.xlsx")
+HET_FILT <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata_unrelated.xlsx ")
 
 #Read in covariation matrix (rows follow final_cramlist_unrel.txt, NOT the spreadsheet)
 cov <- as.matrix(read.table("~/final_autosomal_unrel.cov"))
