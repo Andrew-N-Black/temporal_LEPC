@@ -12,7 +12,7 @@ library(ggpubr)
 library(dplyr)
 
 #load metadata
-HET_FILT <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/sarek_old_new/old_new_heterozygosity.xlsx")
+HET_FILT <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata.xlsx")
 
 #Extract relevant information
 het_cols <- c("heterozygosity_angsd", "heterozygosity_rohan")
