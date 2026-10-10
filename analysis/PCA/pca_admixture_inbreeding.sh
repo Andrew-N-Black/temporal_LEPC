@@ -10,13 +10,17 @@
 # the bcftools-roh and ROHan fROH pipelines -- not yet re-run autosomal/
 # unrelated itself.
 #
+# NOT USED IN THE USFWS REPORT: the report's PCA is run_plink.sh and its
+# clustering is run_faststructure.sh; the pcangsd inbreeding coefficient is
+# not reported. Kept for reference only.
+#
 # USAGE:
 #   sbatch pca_admixture_inbreeding.sh
 # =============================================================================
 #SBATCH --job-name=old_new_pca_inbreed
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A dewoody
+#SBATCH -A fnrdewoody
 #SBATCH -t 10-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

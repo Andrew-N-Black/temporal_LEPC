@@ -26,6 +26,10 @@
 #   <A>_<B>.fst.global.txt                genome-wide FST (unweighted, weighted)
 #   <A>_<B>.fst.windows_<WIN>_<STEP>.txt  region chr midPos Nsites fst
 #   <A>_<B>.2dsfs.ml, <A>_<B>.fst.idx/.gz per-site files (for reruns/plots)
+#
+# Genotype-likelihood cross-check only. The F_ST values in the USFWS report
+# (Objective 1, Table 2) come from called genotypes via
+# temporal_selection/run_lepc_fst.sh + fst_temporal.py.
 # =============================================================================
 #SBATCH --job-name=angsd_fst_temporal
 #SBATCH --output=logs/%x_%A_%a.out

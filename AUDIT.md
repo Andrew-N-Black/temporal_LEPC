@@ -7,53 +7,47 @@ be. Updated across several follow-up passes (ROHan parsing, ROH parsing,
 directory reorganization). This file keeps only what's still relevant:
 resolved items are condensed to one line; open items keep full detail.
 
+## Concordance pass against the USFWS report (2026-10-10)
+
+Checked every script against Objective 1 of the October 2026 USFWS report.
+Changes made:
+
+- **SLURM account** standardized to `fnrdewoody` in every script (the three
+  most recently edited scripts already used it).
+- **`outflank_drift.sh`**: `GENERATIONS` 5 -> 2.63 (7 yr / 2.66 yr per
+  generation), the value the report uses for every N_e.
+- **fastStructure**: no script was versioned. Added
+  `analysis/PCA/run_faststructure.sh` (reconstructed from the reported
+  methods: PLINK2-pruned SNPs, K = 2-5, logistic prior, chooseK.py) --
+  check against what was actually run. `R/plot_finestructure.R` renamed
+  `R/plot_faststructure.R` and given the era x cluster Fisher's test.
+- **R scripts**: `map.R` and `plot_roh.R` had an unterminated string in the
+  `read_xlsx()` path (would not parse); fixed. Stale "CHECK BEFORE USE"
+  headers in `QA_plots.R`, `map.R`, `plot_heterozygosity.R`, `plot_roh.R`
+  replaced: they now read `temporal_metadata.xlsx`, and using all 20 birds
+  for per-individual statistics matches the report.
+- **`load.sh`**: already reads `analysis.autosomes.unrel.vcf.gz`; sample-list
+  comments corrected to 9 + 10 = 19 birds (old item 1 closed, see below).
+- **`analysis/busco/`** removed: assembly BUSCO belongs to Objective 3
+  (`prairie_grouse`, steps 07-09).
+- Headers of `pca_admixture_inbreeding.sh` (PCAngsd) and
+  `fst/angsd_fst_temporal.sh` now state they are not used in the report.
+- README rewritten: 2019/2026 eras, step-by-step map to report sections
+  and settings.
+
+Report text corrected to match the code (report v55): heterozygosity has no
+`-minQ` filter (ANGSD default) and uses `-setMinDepth 3`; f_ROH settings
+(ANGSD `-doBcf`, quality >= 30, ROH < 100 kb not counted); PCA is PLINK2 on
+LD-pruned SNPs (not PCAngsd).
+
 ## Open items
 
-### 1. `analysis/load/load.sh` is on the whole-genome, all-20-sample dataset
-
-The genetic load pipeline's *methodology* is current and correct (SnpEff
-impact classes only; GERP++ and a Grantham radical/conservative split were
-both evaluated and deliberately dropped —
-see the script's own header). But it isn't on the same dataset as every
-other analysis in this repo: `VCF` has no `.auto` in its name (unlike
-`remove_Z_scaffolds.sh`'s output and everything downstream of it), there's
-no Z-scaffold exclusion logic anywhere in the file, and `ALL_SAMPLES` is
-explicitly documented as "All 20 samples (old.samples + new.samples)" --
-normal_F10 included. Not modified here: this is a 674-line script that
-*generates* the actual child SLURM scripts, and getting a mid-pipeline
-edit wrong in something this load-bearing would be worse than flagging it.
-**Needs your input on where to point it** (the `.auto` VCF, and an
-unrelated sample list built from `processing/final_cramlist_unrel.txt`).
-
-### 2. Four R plotting scripts still read the pre-relatedness-filter metadata
-
-`R/plot_heterozygosity.R`, `R/plot_roh.R`, `R/map.R`, and `R/QA_plots.R`
-read `old_new_heterozygosity.xlsx` (20 samples, F10 included).
-`R/plot_pca.R`, `R/plot_pca_plink.R`, and `R/PC_correlations.R` already
-read `old_new_heterozygosity_unrel.xlsx` (19, F10 removed) instead. Still
-not repointed automatically -- the `_unrel` workbook's column schema isn't
-available to confirm `plot_roh.R`'s `fROH_*`, `QA_plots.R`'s
-`DOC`/`properlyPaired`, or `map.R`'s `GPS` columns exist there. Each file
-has a header comment flagging this.
-
-### 3. SLURM account name: `dewoody` vs `fnrdewoody`
-
-`analysis/PCA/heterozygosity_array.sh` uses `-A fnrdewoody` (changed
-directly on GitHub). Every other `#SBATCH -A` line in the repo (17 of
-them, across 13 files) still says `dewoody`. Not changed elsewhere without
-confirming which is actually correct -- if `fnrdewoody` is the real
-account, every other job in this repo would currently fail to submit.
-
-### 4. Two smaller things worth a second look
-
-- `processing/cram_filtering.sh` references the reference genome at
-  `GROUSE/grouse_asm/ref/...`, while every other script uses a copy at
-  `GROUSE/old_vs_new/ref/...`. May be an intentional shared reference, or
-  a leftover from a different project.
-- Upstream numbered pipeline scripts referenced in comments throughout
-  (`05_combined_alignment_array.sh`, `06_downsample_and_finalize.sh`)
-  aren't in this repo. Likely fine if only analysis-stage scripts were
-  meant to be versioned here -- worth confirming that's deliberate.
+1. **`processing/cram_filtering.sh`** reads the reference from
+   `GROUSE/grouse_asm/ref/...`; every other script uses
+   `GROUSE/old_vs_new/ref/...`. Same assembly either way; confirm.
+2. Upstream scripts named in comments (`05_combined_alignment_array.sh`,
+   `06_downsample_and_finalize.sh`) are not in this repo (analysis-stage
+   code only).
 
 ## Incident: heterozygosity_array.sh was overwritten with unrelated content
 
@@ -64,7 +58,7 @@ script -- a genome-assembly pipeline (hifiasm/yahs/RagTag, job name
 Every other file in the repo was individually checked against its own
 header/content for the same kind of mismatch; none found. Restored from
 the last known-good commit (`e3d2031`), preserving the legitimate
-`fnrdewoody` account-name edit made in between (see item 3 above). If you
+`fnrdewoody` account-name edit made in between (account now `fnrdewoody` everywhere). If you
 still need that assembly script, it wasn't otherwise saved by this
 restore -- worth checking its source project's own repo.
 
@@ -94,8 +88,9 @@ restore -- worth checking its source project's own repo.
   earlier pass have since been added directly: `relatedness_vcf.py`,
   `run_lepc_relatedness.sh`, `popmap.txt`, `popmap_unrelated.txt`.
 - **`load.sh` was the pre-revision (GERP-based) draft** -- since replaced
-  with the current SnpEff-impact methodology (see Open item 1 above for
-  what's still outstanding on the *dataset* it points to).
+  with the current SnpEff-impact methodology (now on the autosomal, unrelated
+  dataset).
+- **`load.sh` dataset**: now on the autosomal, unrelated VCF; cluster `old.samples` confirmed n = 9 (F10 absent).
 - **`outflank_drift.sh`'s `FILT_VCF`** produced a redundant filename
   (`...auto.biallelic.snps.AUTO.vcf.gz`); simplified.
 
@@ -140,6 +135,6 @@ they need.
 ## Not reviewed line-by-line
 
 `R/outflank_temporal_dNe_siteclass.R` (562 lines), `analysis/load/load.sh`
-beyond its header/config (674 lines, see Open item 1), and the nf-core
+beyond its header/config, and the nf-core
 configuration files -- read for structure and cross-checked against
 caller variable names, not verified statement-by-statement.

@@ -1,22 +1,17 @@
 # =============================================================================
-# *** CHECK BEFORE USE: reads old_new_heterozygosity.xlsx, the pre-relatedness-
-# filter metadata (all 20 samples, including normal_F10). Three sibling
-# scripts in this directory -- plot_pca.R, plot_pca_plink.R, and
-# PC_correlations.R -- were already updated to read
-# old_new_heterozygosity_unrel.xlsx (19 samples, normal_F10 removed as a
-# first-degree relative of normal_F21) plus the autosomal-only PCA/ROH
-# inputs. This script was not updated to match, and its metadata file may
-# also predate the autosomal (Z-scaffold-excluded) confirmation applied
-# elsewhere in this repo. Not changed automatically here: the "_unrel"
-# workbook's exact columns were not available to verify this plot's fields
-# still exist there. See AUDIT.md before using this script's output.
+# Reads temporal_metadata.xlsx (all 20 birds, 10 per era). Per-individual
+# statistics (heterozygosity, f_ROH, sequencing QC, sampling locations) are
+# reported for all 20 birds in the USFWS report (Objective 1, Table 1,
+# Figures 2-4, S2); relatedness filtering (F10 removal) applies only to the
+# population-level analyses (PCA, fastStructure, F_ST, N_e, load), which use
+# the 19-bird set. All values are autosomal (Z scaffolds excluded upstream).
 # =============================================================================
 #Load library
 library(reshape2)
 library(ggplot2)
 
 #read in metadata
-metadata <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata.xlsx)
+metadata <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata.xlsx")
 
 #Extract relevant information
 sub<-metadata[,c("ID","GRP","fROH_100kb-1Mb","fROH_1Mb","fROH_total")]
@@ -36,7 +31,7 @@ ggplot(melt_data, aes(fill=GRP, y=value, x=reorder(ID,value))) +
         axis.line = element_line(color="black", linewidth=1)
     ) +
     scale_fill_manual("", values=c("Past"="cadetblue","Present"="black")) +
-    ylab("fROH") + xlab("Sample (N=433)") +
+    ylab("fROH") + xlab("Sample (N = 20)") +
     theme(legend.position="none") +
     theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
     theme(axis.text.y = element_text(size=12)) +
@@ -46,13 +41,13 @@ ggplot(melt_data, aes(fill=GRP, y=value, x=reorder(ID,value))) +
 #Test for normality
 shapiro.test(sub$`fROH_100kb-1Mb`)
 
-W = 0.8886, p-value = 0.02535
+#W = 0.8886, p-value = 0.02535
 
 shapiro.test(sub$`fROH_1Mb`)
-W = 0.23587, p-value = 2.693e-09
+#W = 0.23587, p-value = 2.693e-09
 
 shapiro.test(sub$`fROH_total`)
-W = 0.87335, p-value = 0.01346
+#W = 0.87335, p-value = 0.01346
 
 #Pairwise test
 pairwise.wilcox.test(sub$`fROH_100kb-1Mb`, sub$GRP, p.adjust.method = "BH")

@@ -26,7 +26,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=200G
 #SBATCH --time=24:00:00
-#SBATCH -A dewoody
+#SBATCH -A fnrdewoody
 #SBATCH -p cpu
 
 set -euo pipefail
@@ -53,7 +53,9 @@ GERP_TSV=""                  # optional per-site <CHROM> <POS> <RS>; "" = SnpEff
 GERP_MIN=2                   # min GERP RS for a site to count as deleterious
 NEUTRAL_MODE="synonymous"    # synonymous | synonymous+intergenic
 
-GENERATIONS=5                # elapsed generations between Past and Present samples
+GENERATIONS=2.63             # elapsed generations, 2019->2026: 7 yr / 2.66 yr per generation
+                             # (New Mexico; Pruett et al. 2011). Ne scales linearly with t:
+                             # t ~ 3.6 (1.92-1.95 yr generations) gives Ne x 1.37
 MAX_MISSING=0.2              # bcftools: drop sites with >= this fraction missing
 MIN_CALLED=5                 # R: min called individuals in EACH period
 MAX_FIT_LOCI=100000          # R: random loci used to fit the OutFLANK null

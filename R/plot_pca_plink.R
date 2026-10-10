@@ -1,4 +1,7 @@
+# USFWS report Objective 1, Figure 5: PLINK2 PCA of the 19 unrelated birds
+# (outputs of analysis/PCA/run_plink.sh).
 library(tidyverse)
+library(readxl)
 library(dplyr)
 
 metadata <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata_unrelated.xlsx")

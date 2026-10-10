@@ -18,7 +18,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=64G
 #SBATCH --time=08:00:00
-#SBATCH -A dewoody
+#SBATCH -A fnrdewoody
 #SBATCH -p cpu
 
 set -euo pipefail

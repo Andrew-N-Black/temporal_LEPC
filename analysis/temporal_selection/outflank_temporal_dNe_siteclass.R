@@ -10,7 +10,7 @@
 #       --vcf old_vs_new.biallelic.snps.vcf.gz \
 #       --popmap popmap.txt \
 #       --siteclass siteclass.txt \
-#       --generations 5 \
+#       --generations 2.63 \
 #       --outprefix results/old_vs_new
 #
 # Input VCF: prefiltered to biallelic SNPs (see the SLURM wrapper).

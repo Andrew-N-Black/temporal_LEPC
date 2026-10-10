@@ -1,9 +1,11 @@
+# PCAngsd covariance-matrix PCA (19 unrelated birds). NOT the report figure:
+# Figure 5 is the PLINK2 PCA (plot_pca_plink.R). Kept for reference.
 #Load libraries
 library(readxl)
 library(ggplot2)
 
 #Read in metadata
-HET_FILT <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata_unrelated.xlsx ")
+HET_FILT <- read_xlsx("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/temporal_metadata_unrelated.xlsx")
 
 #Read in covariation matrix (rows follow final_cramlist_unrel.txt, NOT the spreadsheet)
 cov <- as.matrix(read.table("/Users/andrewblack/Documents/Research/GROUSE/USFWS_REPORTS/files/final_autosomal_unrel.cov"))

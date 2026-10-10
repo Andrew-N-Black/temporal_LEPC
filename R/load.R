@@ -1,4 +1,4 @@
-!/usr/bin/env Rscript
+#!/usr/bin/env Rscript
 # ---------------------------------------------------------------------------
 # Plot LEPC genetic-load results (Past 2019 vs Present 2026)
 #
@@ -10,7 +10,7 @@
 #
 # then point DATA_DIR at wherever you put them and run:
 #
-#   Rscript plot_lepc_load.R
+#   Rscript load.R
 #
 # Figures carry no title, subtitle or caption -- everything a reader needs is
 # either annotated onto the panel or written to figure_legends.txt, ready to

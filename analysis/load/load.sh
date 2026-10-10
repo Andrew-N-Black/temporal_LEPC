@@ -43,9 +43,10 @@ ANC=$OUT/ancestral/LEPC_ancestral_from_chicken.fa
 THREADS=64
 
 SNPEFF_DB=LEPC_custom                           # Custom SnpEff database name to build
-OLD_SAMPLES=$PROJ/sample_lists/old.samples      # Historical/museum-era samples
-NEW_SAMPLES=$PROJ/sample_lists/new.samples      # Contemporary samples
-ALL_SAMPLES=$PROJ/sample_lists/all.samples      # All 20 samples (old.samples + new.samples)
+OLD_SAMPLES=$PROJ/sample_lists/old.samples      # 2019 ("Past") birds, n = 9 (F10 excluded)
+NEW_SAMPLES=$PROJ/sample_lists/new.samples      # 2026 ("Present") birds, n = 10
+ALL_SAMPLES=$PROJ/sample_lists/all.samples      # 19 unrelated birds (old.samples + new.samples; normal_F10 excluded,
+                                                # matching the .autosomes.unrel VCF above)
 
 mkdir -p $PROJ/scripts $PROJ/logs $OUT/{ancestral,snpeff,polarized,load,logs}
 
@@ -59,7 +60,7 @@ cat << 'EOF' > $PROJ/scripts/step1_build_ancestral.sh
 #SBATCH --job-name=lepc_ancestral
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A dewoody
+#SBATCH -A fnrdewoody
 #SBATCH -t 10-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -290,7 +291,7 @@ cat << 'EOF' > $PROJ/scripts/step2_snpeff_annotate.sh
 #SBATCH --job-name=lepc_snpeff
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A dewoody
+#SBATCH -A fnrdewoody
 #SBATCH -t 10-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -375,7 +376,7 @@ cat << 'EOF' > $PROJ/scripts/step4_polarize.sh
 #SBATCH --job-name=lepc_polarize
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A dewoody
+#SBATCH -A fnrdewoody
 #SBATCH -t 10-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -543,7 +544,7 @@ cat << 'EOF' > $PROJ/scripts/step5_deleterious_sites.sh
 #SBATCH --job-name=lepc_del_sites
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A dewoody
+#SBATCH -A fnrdewoody
 #SBATCH -t 10-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -663,7 +664,7 @@ cat << 'EOF' > $PROJ/scripts/step6_load_per_individual.sh
 #SBATCH --job-name=lepc_load
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A dewoody
+#SBATCH -A fnrdewoody
 #SBATCH -t 10-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

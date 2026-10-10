@@ -2,7 +2,7 @@
 #SBATCH --job-name=ne_temporal_input
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A dewoody
+#SBATCH -A fnrdewoody
 #SBATCH -p cpu
 #SBATCH -t 0-04:00:00
 #SBATCH --nodes=1
