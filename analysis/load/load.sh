@@ -60,7 +60,7 @@ cat << 'EOF' > $PROJ/scripts/step1_build_ancestral.sh
 #SBATCH --job-name=lepc_ancestral
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A fnrdewoody
+#SBATCH -A dewoody
 #SBATCH -t 10-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -291,7 +291,7 @@ cat << 'EOF' > $PROJ/scripts/step2_snpeff_annotate.sh
 #SBATCH --job-name=lepc_snpeff
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A fnrdewoody
+#SBATCH -A dewoody
 #SBATCH -t 10-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -376,7 +376,7 @@ cat << 'EOF' > $PROJ/scripts/step4_polarize.sh
 #SBATCH --job-name=lepc_polarize
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A fnrdewoody
+#SBATCH -A dewoody
 #SBATCH -t 10-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -544,7 +544,7 @@ cat << 'EOF' > $PROJ/scripts/step5_deleterious_sites.sh
 #SBATCH --job-name=lepc_del_sites
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A fnrdewoody
+#SBATCH -A dewoody
 #SBATCH -t 10-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -664,7 +664,7 @@ cat << 'EOF' > $PROJ/scripts/step6_load_per_individual.sh
 #SBATCH --job-name=lepc_load
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A fnrdewoody
+#SBATCH -A dewoody
 #SBATCH -t 10-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

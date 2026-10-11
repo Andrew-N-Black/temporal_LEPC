@@ -12,7 +12,10 @@ resolved items are condensed to one line; open items keep full detail.
 Checked every script against Objective 1 of the October 2026 USFWS report.
 Changes made:
 
-- **SLURM account** standardized to `fnrdewoody` in every script (the three
+- **SLURM account** (corrected 2026-10-11): `dewoody` is the Gautschi account and `fnrdewoody` the
+  Negishi account. Scripts with hard-coded Gautschi paths use `dewoody`; heterozygosity_array.sh,
+  bcftools_roh.sh and angsd_fst_temporal.sh (portable, run on Negishi) keep `fnrdewoody`. An earlier
+  pass had wrongly set `fnrdewoody` in every script (the three
   most recently edited scripts already used it).
 - **`outflank_drift.sh`**: `GENERATIONS` 5 -> 2.63 (7 yr / 2.66 yr per
   generation), the value the report uses for every N_e.
@@ -58,7 +61,7 @@ script -- a genome-assembly pipeline (hifiasm/yahs/RagTag, job name
 Every other file in the repo was individually checked against its own
 header/content for the same kind of mismatch; none found. Restored from
 the last known-good commit (`e3d2031`), preserving the legitimate
-`fnrdewoody` account-name edit made in between (account now `fnrdewoody` everywhere). If you
+`fnrdewoody` account-name edit made in between (see the SLURM account note above). If you
 still need that assembly script, it wasn't otherwise saved by this
 restore -- worth checking its source project's own repo.
 

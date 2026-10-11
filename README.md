@@ -16,7 +16,7 @@ table or figure it produces. Sequence data: NCBI BioProject PRJNA1513026
   the two Z-linked scaffolds (`NW_026294758.1`, `NW_026294813.1`; 74.2 Mb)
   are excluded from every analysis. Autosomal length used as the f_ROH
   denominator: ~920 Mb.
-- Cluster: Purdue RCAC Gautschi, SLURM account `fnrdewoody`.
+- Cluster: Purdue RCAC Gautschi (most steps) and Negishi. SLURM accounts: `dewoody` on Gautschi, `fnrdewoody` on Negishi. Scripts with hard-coded `/scratch/gautschi` paths use `dewoody`; the few that use `${CLUSTER_SCRATCH}` and were run on Negishi keep `fnrdewoody` -- change `#SBATCH -A` (or pass `sbatch -A`) to match the cluster you submit on.
 
 ## Sample sets
 

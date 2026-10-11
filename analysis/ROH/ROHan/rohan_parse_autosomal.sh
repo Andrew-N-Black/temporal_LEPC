@@ -2,7 +2,7 @@
 #SBATCH --job-name=lepc_rohan_parse_auto
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A fnrdewoody
+#SBATCH -A dewoody
 #SBATCH -t 00:30:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

@@ -20,7 +20,7 @@
 #SBATCH --job-name=old_new_pca_inbreed
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-#SBATCH -A fnrdewoody
+#SBATCH -A dewoody
 #SBATCH -t 10-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

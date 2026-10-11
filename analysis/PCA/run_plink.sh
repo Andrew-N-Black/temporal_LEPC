@@ -6,7 +6,7 @@
 #SBATCH --mem=32G
 #SBATCH --time=04:00:00
 #SBATCH --output=pca_auto_unrel_%j.log
-#SBATCH -A fnrdewoody
+#SBATCH -A dewoody
 #SBATCH -p cpu
 
 # =============================================================================

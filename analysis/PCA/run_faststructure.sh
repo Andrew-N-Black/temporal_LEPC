@@ -6,7 +6,7 @@
 #SBATCH --mem=16G
 #SBATCH --time=12:00:00
 #SBATCH --output=faststructure_auto_unrel_%j.log
-#SBATCH -A fnrdewoody
+#SBATCH -A dewoody
 #SBATCH -p cpu
 
 # =============================================================================
